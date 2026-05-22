@@ -67,7 +67,7 @@ export const paymentGatewayOptions: Array<{
   value: PaymentGatewayProvider;
   label: string;
 }> = [
-  { value: "MOVEX", label: "Movex" },
+  { value: "MOBBEX", label: "Mobbex" },
   { value: "PAYWAY", label: "Payway" },
   { value: "SIRO", label: "Siro" },
 ];

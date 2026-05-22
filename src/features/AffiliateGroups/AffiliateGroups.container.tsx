@@ -12,6 +12,7 @@ import {
 import type {
   AffiliateGroupsRow,
   AffiliateStatus,
+  CreateGroupSubmitResult,
   CreateAffiliateGroupModalPayload,
 } from "./AffiliateGroups.types";
 import {
@@ -76,9 +77,9 @@ const AffiliateGroupsContainer: React.FC = () => {
 
   const handleCreateAffiliate = async (
     data: CreateAffiliateGroupModalPayload,
-  ) => {
-    if (createGroupLoading) return;
-    await dispatch(onCreateGroupThunk(data));
+  ): Promise<CreateGroupSubmitResult | undefined> => {
+    if (createGroupLoading) return undefined;
+    return dispatch(onCreateGroupThunk(data));
   };
 
   return (

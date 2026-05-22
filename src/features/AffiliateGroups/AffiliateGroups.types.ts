@@ -2,7 +2,7 @@ export type AffiliateStatus = "active" | "suspended" | "no-coverage";
 
 export type PaymentMode = "automatic" | "cash";
 export type CardType = "credit" | "debit" | "prepaid";
-export type PaymentGatewayProvider = "SIRO" | "PAYWAY" | "MOVEX";
+export type PaymentGatewayProvider = "SIRO" | "PAYWAY" | "MOBBEX";
 export type PaymentMethodType = "CARD" | "CBU";
 export type ManualPaymentMethod = "CARD" | "CASH" | "TRANSFER";
 
@@ -37,6 +37,8 @@ export interface AutomaticAffiliateGroupFormData {
   cardType: CardType;
   gateway: PaymentGatewayProvider;
   plan: string;
+  mobbexSubscriptionId: string;
+  mobbexWebhook?: string;
   paymentMethod: "card" | "cbu";
   cardNumber: string;
   cardMonth: string;
@@ -120,6 +122,34 @@ export interface GroupResponse {
     attemptId?: number;
     result?: string;
   };
+}
+
+export interface MobbexSubscriptionSummary {
+  uid: string;
+  name: string;
+  description: string;
+  type: string;
+  status: string;
+  total: number;
+  currency: string;
+  interval: string;
+  returnUrl: string;
+  webhook: string;
+  test: boolean;
+}
+
+export interface MobbexGroupSubscriberResponse {
+  result: boolean;
+  code?: string;
+  error?: string;
+  subscriptionId: string;
+  subscriberUid?: string;
+  sourceUrl?: string;
+}
+
+export interface CreateGroupSubmitResult {
+  group: GroupResponse;
+  mobbexSourceUrl?: string;
 }
 
 export interface UpdateAffiliateRequest {

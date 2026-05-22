@@ -37,10 +37,10 @@ export function mapCashFormToAffiliateRequests(
 export function mapAutomaticFormToPaymentMethodRequest(input: {
   gateway: PaymentGatewayProvider;
   priority?: number;
-  cardNumber: string;
-  cardMonth: string;
-  cardYear: string;
-  cardCvv: string;
+  cardNumber?: string;
+  cardMonth?: string;
+  cardYear?: string;
+  cardCvv?: string;
   firstName: string;
   lastName: string;
   cardType?: string;
@@ -53,21 +53,42 @@ export function mapAutomaticFormToPaymentMethodRequest(input: {
   phone?: string;
   deviceFingerprintId?: string;
 }): CreateGroupPaymentMethodRequest {
-  const expiryMonth = Number.parseInt(input.cardMonth, 10);
-  const rawYear = Number.parseInt(input.cardYear, 10);
+  if (input.gateway === "MOBBEX") {
+    return {
+      gateway: input.gateway,
+      type: "CARD",
+      priority: input.priority ?? 1,
+      holderName: `${input.firstName.trim()} ${input.lastName.trim()}`.trim(),
+      brand: input.cardType,
+      documentNumber: input.documentNumber
+        ? toDigits(input.documentNumber)
+        : undefined,
+      email: input.email?.trim() || undefined,
+      address: input.address?.trim() || undefined,
+      city: input.city?.trim() || undefined,
+      province: input.province?.trim() || undefined,
+      postalCode: input.postalCode?.trim() || undefined,
+      phone: input.phone ? toDigits(input.phone) : undefined,
+    };
+  }
+
+  const expiryMonth = Number.parseInt(input.cardMonth ?? "", 10);
+  const rawYear = Number.parseInt(input.cardYear ?? "", 10);
   const expiryYear = rawYear < 100 ? 2000 + rawYear : rawYear;
+  const cardNumber = toDigits(input.cardNumber ?? "");
+  const cardCvv = toDigits(input.cardCvv ?? "");
 
   return {
     gateway: input.gateway,
     type: "CARD",
     priority: input.priority ?? 1,
-    cardNumber: toDigits(input.cardNumber),
-    cvv: toDigits(input.cardCvv),
+    cardNumber,
+    cvv: cardCvv,
     expiryMonth,
     expiryYear,
     holderName: `${input.firstName.trim()} ${input.lastName.trim()}`.trim(),
     brand: input.cardType,
-    last4: toDigits(input.cardNumber).slice(-4),
+    last4: cardNumber.slice(-4),
     documentNumber: input.documentNumber
       ? toDigits(input.documentNumber)
       : undefined,

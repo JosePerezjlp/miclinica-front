@@ -6,11 +6,27 @@ import {
   mapCashFormToCreateGroupRequest,
 } from "../../api/affiliateGroups.mappers";
 import { groupsService } from "../../api/groups.service";
+import { mobbexService } from "../../api/mobbex.service";
 import type {
+  CreateGroupSubmitResult,
   CreateAffiliateGroupModalPayload,
   GroupResponse,
 } from "./AffiliateGroups.types";
 import type { RootState } from "../../store/store";
+
+function toDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function buildSubscriptionStartDate() {
+  const now = new Date();
+
+  return {
+    day: now.getDate(),
+    month: now.getMonth() + 1,
+    year: now.getFullYear(),
+  };
+}
 
 export const CREATE_GROUP = "CREATE_GROUP";
 export const CREATE_GROUP_SUCCESS = "CREATE_GROUP_SUCCESS";
@@ -33,7 +49,12 @@ export const onCreateGroupError = (error: string) => ({
 export const onCreateGroupThunk =
   (
     payload: CreateAffiliateGroupModalPayload,
-  ): ThunkAction<Promise<GroupResponse>, RootState, unknown, Action> =>
+  ): ThunkAction<
+    Promise<CreateGroupSubmitResult>,
+    RootState,
+    unknown,
+    Action
+  > =>
   async (dispatch) => {
     dispatch(onCreateGroup());
 
@@ -45,6 +66,43 @@ export const onCreateGroupThunk =
 
       const group = await groupsService.create(request);
       dispatch(onCreateGroupSuccess(group));
+
+      if (payload.mode === "automatic" && payload.gateway === "MOBBEX") {
+        if (!payload.mobbexSubscriptionId) {
+          throw new Error("Seleccioná un plan de Mobbex antes de continuar.");
+        }
+
+        const subscriber = await mobbexService.createGroupSubscriber(
+          group.id,
+          payload.mobbexSubscriptionId,
+          {
+            customer: {
+              email: payload.email.trim(),
+              name: `${payload.firstName.trim()} ${payload.lastName.trim()}`.trim(),
+              identification: toDigits(payload.dni),
+            },
+            startDate: buildSubscriptionStartDate(),
+            webhook: payload.mobbexWebhook || undefined,
+          },
+        );
+
+        if (!subscriber.result || !subscriber.sourceUrl) {
+          throw new Error(
+            subscriber.error ||
+              subscriber.code ||
+              "Mobbex no devolvió una URL para completar la suscripción.",
+          );
+        }
+
+        toast.success(
+          `Grupo #${group.id} creado. Link de Mobbex generado para enviar al cliente.`,
+        );
+
+        return {
+          group,
+          mobbexSourceUrl: subscriber.sourceUrl,
+        };
+      }
 
       if (payload.mode === "automatic") {
         const charge = group.initialCharge;
@@ -69,15 +127,18 @@ export const onCreateGroupThunk =
         );
       }
 
-      return group;
+      return { group };
     } catch (error) {
-      const message = (
+      const responseMessage = (
         error as { response?: { data?: { message?: string | string[] } } }
       )?.response?.data?.message;
 
-      const parsedMessage = Array.isArray(message)
-        ? message.join(", ")
-        : (message ?? "Could not create the group.");
+      const fallbackMessage =
+        error instanceof Error ? error.message : "Could not create the group.";
+
+      const parsedMessage = Array.isArray(responseMessage)
+        ? responseMessage.join(", ")
+        : (responseMessage ?? fallbackMessage);
 
       dispatch(onCreateGroupError(parsedMessage));
       toast.error(parsedMessage);
