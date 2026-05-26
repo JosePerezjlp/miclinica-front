@@ -3,6 +3,7 @@ import type { RootState } from "../../store/store";
 import type { Action } from "redux";
 import apiClient from "../../api/apiClient";
 import toast from "react-hot-toast";
+import {AuthService} from "../../api/auth.service";
 
 // Action constants
 export const LOGIN = "LOGIN";
@@ -28,20 +29,10 @@ export const onLoginThunk =
   ): ThunkAction<Promise<void>, RootState, unknown, Action> =>
   async (dispatch) => {
     dispatch(onLogin());
-    if (credentials.username === "admin" && credentials.password === "123456") {
-      const fakeToken = "fake-jwt-token-admin";
-      localStorage.setItem("token", fakeToken);
-      dispatch(onLoginSuccess(fakeToken));
-      callbacks?.onSuccess?.();
-      return;
-    }
     try {
-      const { data } = await apiClient.post<{ token: string }>(
-        "/auth/login",
-        credentials,
-      );
-      localStorage.setItem("token", data.token);
-      dispatch(onLoginSuccess(data.token));
+      const data = await AuthService.login(credentials.username, credentials.password);
+      localStorage.setItem("token", data.accessToken);
+      dispatch(onLoginSuccess(data.accessToken));
       callbacks?.onSuccess?.();
     } catch (err: unknown) {
       const message =

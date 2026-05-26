@@ -13,6 +13,7 @@ import type {
   GroupResponse,
 } from "./AffiliateGroups.types";
 import type { RootState } from "../../store/store";
+import {familiarGroupGet} from "../../api/groups.service";
 
 function toDigits(value: string): string {
   return value.replace(/\D/g, "");
@@ -45,6 +46,8 @@ export const onCreateGroupError = (error: string) => ({
   type: CREATE_GROUP_ERROR as typeof CREATE_GROUP_ERROR,
   payload: error,
 });
+
+
 
 export const onCreateGroupThunk =
   (
@@ -143,5 +146,41 @@ export const onCreateGroupThunk =
       dispatch(onCreateGroupError(parsedMessage));
       toast.error(parsedMessage);
       throw error;
+    }
+  };
+
+  // Action constants
+export const GET_GROUPS = "GET_GROUPS";
+export const GET_GROUPS_SUCCESS = "GET_GROUPS_SUCCESS";
+export const GET_GROUPS_ERROR = "GET_GROUPS_ERROR";
+
+// Action creators
+export const onGetGroups = () => ({ type: GET_GROUPS as typeof GET_GROUPS });
+export const onGetGroupsSuccess = (groups: GroupResponse[]) => ({
+  type: GET_GROUPS_SUCCESS as typeof GET_GROUPS_SUCCESS,
+  payload: groups,
+});
+export const onGetGroupsError = (error: string) => ({
+  type: GET_GROUPS_ERROR as typeof GET_GROUPS_ERROR,
+  payload: error,
+});
+
+// Thunk
+export const getGroupsThunk =
+  (): ThunkAction<Promise<void>, RootState, unknown, Action> =>
+  async (dispatch) => {
+    dispatch(onGetGroups());
+    try {
+      const data = await familiarGroupGet.getGroups();
+      console.log(data)
+      dispatch(onGetGroupsSuccess([data]));
+   
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ?? "Error al iniciar sesión";
+      toast.error(message);
+      dispatch(onGetGroupsError(message));
+     
     }
   };

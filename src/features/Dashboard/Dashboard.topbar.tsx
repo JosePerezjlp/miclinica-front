@@ -1,7 +1,12 @@
 import React from 'react';
-import { Bell, Search, UserCog } from 'lucide-react';
+import { Bell, Search, UserCog, LogOut  } from 'lucide-react';
 
 const DashboardTopbar: React.FC = () => {
+  const handleLogOut = () => {
+    localStorage.removeItem("token");
+    window.location.href = "/login";
+  }
+  
   return (
     <header className="h-20 bg-white border-b border-slate-200 px-6 flex items-center gap-4">
       <button className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500">
@@ -17,9 +22,13 @@ const DashboardTopbar: React.FC = () => {
         />
       </div>
 
-      <button type="button" className="relative p-2 rounded-lg hover:bg-slate-100 ml-auto">
+      <button type="button" className="relative p-2 rounded-lg hover:bg-slate-100">
         <Bell className="w-5 h-5 text-slate-600" />
         <span className="absolute top-1 right-1 block w-2.5 h-2.5 rounded-full bg-red-500" />
+      </button>
+
+      <button type="button" className="relative p-2 rounded-lg hover:bg-slate-100 ml-auto">
+        <LogOut className="w-5 h-5 text-red-600" onClick={handleLogOut} />
       </button>
     </header>
   );

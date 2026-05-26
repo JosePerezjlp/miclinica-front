@@ -2,6 +2,7 @@ import {
   CREATE_GROUP,
   CREATE_GROUP_ERROR,
   CREATE_GROUP_SUCCESS,
+  GET_GROUPS_SUCCESS,
 } from "./AffiliateGroups.action";
 import type { GroupResponse } from "./AffiliateGroups.types";
 
@@ -9,13 +10,16 @@ interface AffiliateGroupsState {
   createGroupLoading: boolean;
   createGroupError: string | null;
   lastCreatedGroup: GroupResponse | null;
+  data: GroupResponse[] | null | string;
 }
 
 const initialState: AffiliateGroupsState = {
   createGroupLoading: false,
   createGroupError: null,
   lastCreatedGroup: null,
+  data: null,
 };
+
 
 type AffiliateGroupsAction = {
   type: string;
@@ -46,6 +50,12 @@ export const affiliateGroupsReducer = (
         createGroupLoading: false,
         createGroupError: (action.payload as string) ?? null,
       };
+  case GET_GROUPS_SUCCESS:
+      return {
+        ...state,      
+        data: (action.payload as string) ?? null,
+      };
+      
     default:
       return state;
   }

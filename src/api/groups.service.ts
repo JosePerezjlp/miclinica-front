@@ -8,5 +8,12 @@ export const groupsService = {
   async create(payload: CreateGroupRequest) {
     const { data } = await apiClient.post<GroupResponse>("/groups", payload);
     return data;
-  },
+  },  
 };
+
+export const familiarGroupGet = {
+  async getGroups() {
+    const { data } = await apiClient.get("/groups/familiarGroups");
+    return data[0];
+  }
+}
