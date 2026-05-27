@@ -4,6 +4,9 @@ import { registerReducer } from "../features/Register/Register.reducer";
 import { affiliateGroupsReducer } from "../features/AffiliateGroups/AffiliateGroups.reducer";
 import { plansReducer } from "../features/Plans/Plans.reducer";
 import { promotersReducer } from "../features/Promoters/Promoters.reducer";
+import { usersReducer } from "../features/Users/Users.reducer";
+import { rolesReducer } from "../features/Roles/Roles.reducer";
+import { accessModulesReducer } from "../features/Modules/Modules.reducer";
 import groupDetailReducer from "../features/AffiliateGroups/AffiliateGroups.detail.reducer";
 
 export const store = configureStore({
@@ -13,6 +16,9 @@ export const store = configureStore({
     affiliateGroups: affiliateGroupsReducer,
     plans: plansReducer,
     promoters: promotersReducer,
+    users: usersReducer,
+    roles: rolesReducer,
+    accessModules: accessModulesReducer,
     groupDetail: groupDetailReducer,
   },
 });

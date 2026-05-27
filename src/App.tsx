@@ -6,6 +6,9 @@ import DashboardContainer from "./features/Dashboard/Dashboard.container";
 import AffiliateGroupsContainer from "./features/AffiliateGroups/AffiliateGroups.container";
 import PlansContainer from "./features/Plans/Plans.container";
 import PromotersContainer from "./features/Promoters/Promoters.container";
+import UsersContainer from "./features/Users/Users.container";
+import RolesContainer from "./features/Roles/Roles.container";
+import ModulesContainer from "./features/Modules/Modules.container";
 import AffiliateGroupsDetailContainer from "./features/AffiliateGroups/AffiliateGroups.detail.container";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAppSelector } from "./store/hooks";
@@ -82,6 +85,36 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <PromotersContainer />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <UsersContainer />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/roles"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <RolesContainer />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/modules"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <ModulesContainer />
               </DashboardLayout>
             </ProtectedRoute>
           }

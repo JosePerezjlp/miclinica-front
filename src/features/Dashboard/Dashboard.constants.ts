@@ -129,6 +129,9 @@ export const sideSections: DashboardSideSection[] = [
       { label: "Pagos Adelantados", icon: CalendarCheck },
       { label: "Control General", icon: ListChecks },
       { label: "Calificacion", icon: Star },
+      { label: "Usuarios", icon: Users, path: "/users" },
+      { label: "Roles", icon: Shield, path: "/roles" },
+      { label: "Modulos", icon: Briefcase, path: "/modules" },
     ],
   },
 ];
