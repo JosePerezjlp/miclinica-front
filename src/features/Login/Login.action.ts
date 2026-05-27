@@ -1,9 +1,9 @@
 import type { ThunkAction } from "redux-thunk";
 import type { RootState } from "../../store/store";
 import type { Action } from "redux";
-import apiClient from "../../api/apiClient";
 import toast from "react-hot-toast";
-import {AuthService} from "../../api/auth.service";
+import { AuthService } from "../../api/auth.service";
+import { setAuthTokens } from "../../api/tokenStorage";
 
 // Action constants
 export const LOGIN = "LOGIN";
@@ -30,8 +30,11 @@ export const onLoginThunk =
   async (dispatch) => {
     dispatch(onLogin());
     try {
-      const data = await AuthService.login(credentials.username, credentials.password);
-      localStorage.setItem("token", data.accessToken);
+      const data = await AuthService.login(
+        credentials.username,
+        credentials.password,
+      );
+      setAuthTokens(data.accessToken, data.refreshToken);
       dispatch(onLoginSuccess(data.accessToken));
       callbacks?.onSuccess?.();
     } catch (err: unknown) {

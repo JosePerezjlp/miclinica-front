@@ -1,10 +1,10 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
-import type { AffiliateGroupsSideSection } from "./AffiliateGroups.types";
+import type { DashboardSideSection } from "../Dashboard/Dashboard.types";
 
 interface AffiliateGroupsSidebarProps {
-  sections: AffiliateGroupsSideSection[];
+  sections: DashboardSideSection[];
 }
 
 const AffiliateGroupsSidebar: React.FC<AffiliateGroupsSidebarProps> = ({
@@ -22,36 +22,35 @@ const AffiliateGroupsSidebar: React.FC<AffiliateGroupsSidebarProps> = ({
       <div className="h-[calc(100vh-44px)] overflow-y-auto px-0 py-2">
         {sections.map((section) => (
           <div key={section.title}>
-            {section.items.map((item) => {
-              const Icon = item.icon;
-              const isActive = item.path
-                ? location.pathname === item.path
-                : item.active;
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => item.path && navigate(item.path)}
-                  className={`w-full text-left px-4 py-2 border-l-2 transition-colors ${
-                    isActive
-                      ? "bg-slate-200 border-l-blue-600"
-                      : "border-l-transparent hover:bg-slate-200"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className="w-5 h-5 text-slate-900" />
-                    <div>
-                      <p className="text-[30px] font-medium text-slate-900">
-                        {item.label}
-                      </p>
-                      <p className="text-[27px] text-slate-500">
-                        {item.description}
-                      </p>
+            {section.items.map(
+              (item: DashboardSideSection["items"][number]) => {
+                const Icon = item.icon;
+                const isActive = item.path
+                  ? location.pathname === item.path
+                  : item.active;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => item.path && navigate(item.path)}
+                    className={`w-full text-left px-4 py-2 border-l-2 transition-colors ${
+                      isActive
+                        ? "bg-slate-200 border-l-blue-600"
+                        : "border-l-transparent hover:bg-slate-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-5 h-5 text-slate-900" />
+                      <div>
+                        <p className="text-[30px] font-medium text-slate-900">
+                          {item.label}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              },
+            )}
           </div>
         ))}
 

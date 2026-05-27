@@ -37,6 +37,7 @@ export interface AutomaticAffiliateGroupFormData {
   cardType: CardType;
   gateway: PaymentGatewayProvider;
   plan: string;
+  planId?: number;
   mobbexSubscriptionId: string;
   mobbexWebhook?: string;
   paymentMethod: "card" | "cbu";
@@ -58,9 +59,11 @@ export interface AutomaticAffiliateGroupFormData {
 
 export interface CashAffiliateGroupFormData {
   mode: "cash";
-  promoter: string;
+  promoterId?: number;
+  promoterName?: string;
   seller: string;
   plan: string;
+  planId?: number;
   city: string;
   members: CashMember[];
 }
@@ -81,6 +84,7 @@ export interface CreateGroupRequest {
   name?: string;
   holderFullName?: string;
   planId?: number;
+  promoterId?: number;
   planName?: string;
   affiliates: CreateAffiliateRequest[];
   paymentMethod?: CreateGroupPaymentMethodRequest;
@@ -91,9 +95,17 @@ export interface GroupResponse {
   name: string;
   holderFullName: string;
   planId?: number | null;
+  promoterId?: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  promoter?: {
+    id: number;
+    name: string;
+    percentage: number | string;
+    isActive: boolean;
+    isInternal: boolean;
+  } | null;
   affiliates: Array<{
     id: number;
     firstName: string;

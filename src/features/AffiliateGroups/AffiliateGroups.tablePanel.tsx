@@ -68,9 +68,9 @@ const AffiliateGroupsTablePanel: React.FC<AffiliateGroupsTablePanelProps> = ({
           </thead>
           <tbody>
             <tr className="bg-slate-100 text-[15px]">
-              <td className="py-3 px-4 font-semibold italic">{rowData.type}</td>
+              <td className="py-3 px-4 font-semibold italic">Grupo</td>
               <td className="py-3 px-4 font-semibold italic">
-                {rowData.fullName}
+                {rowData.titular}
               </td>
               <td className="py-3 px-4 font-semibold italic">
                 {rowData.inscriptionDate}
@@ -80,7 +80,7 @@ const AffiliateGroupsTablePanel: React.FC<AffiliateGroupsTablePanelProps> = ({
               <td className="py-3 px-4">{rowData.plan}</td>
               <td className="py-3 px-4">
                 <div className="inline-flex overflow-hidden rounded-md border border-red-300">
-                  {rowData.months.map((month) => (
+                  {rowData.paidMonths.map((month: string) => (
                     <span
                       key={month}
                       className="px-2 py-1 text-[11px] font-semibold bg-red-200 border-r border-red-300 last:border-r-0"
