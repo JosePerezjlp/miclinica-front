@@ -2,6 +2,8 @@ import { configureStore } from "@reduxjs/toolkit";
 import { loginReducer } from "../features/Login/Login.reducer";
 import { registerReducer } from "../features/Register/Register.reducer";
 import { affiliateGroupsReducer } from "../features/AffiliateGroups/AffiliateGroups.reducer";
+import { plansReducer } from "../features/Plans/Plans.reducer";
+import { promotersReducer } from "../features/Promoters/Promoters.reducer";
 import groupDetailReducer from "../features/AffiliateGroups/AffiliateGroups.detail.reducer";
 
 export const store = configureStore({
@@ -9,6 +11,8 @@ export const store = configureStore({
     login: loginReducer,
     register: registerReducer,
     affiliateGroups: affiliateGroupsReducer,
+    plans: plansReducer,
+    promoters: promotersReducer,
     groupDetail: groupDetailReducer,
   },
 });

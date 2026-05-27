@@ -131,7 +131,8 @@ export function mapAutomaticFormToCreateGroupRequest(
       ? `${holderLastName} Family`
       : `${holderFirstName} Group`,
     holderFullName,
-    planName: payload.plan,
+    planId: payload.planId,
+    planName: payload.gateway === "MOBBEX" ? payload.plan : undefined,
     affiliates: [
       {
         firstName: holderFirstName,
@@ -176,7 +177,8 @@ export function mapCashFormToCreateGroupRequest(
       ? `${holder.lastName.trim()} Family`
       : "Cash Group",
     holderFullName,
-    planName: payload.plan,
+    planId: payload.planId,
+    promoterId: payload.promoterId,
     affiliates: mapCashFormToAffiliateRequests(payload),
   };
 }

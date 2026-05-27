@@ -111,7 +111,7 @@ export const sideSections: DashboardSideSection[] = [
       },
       { label: "Afiliados", icon: BookUser, path: "/affiliate-groups" },
       { label: "Carnet Online", icon: CreditCard },
-      { label: "Planes", icon: ScanText },
+      { label: "Planes", icon: ScanText, path: "/plans" },
     ],
   },
   {
@@ -119,7 +119,7 @@ export const sideSections: DashboardSideSection[] = [
     items: [
       { label: "Afiliacion Online", icon: NotebookPen },
       { label: "Cobradores", icon: Briefcase },
-      { label: "Promotores", icon: Megaphone },
+      { label: "Promotores", icon: Megaphone, path: "/promoters" },
     ],
   },
   {

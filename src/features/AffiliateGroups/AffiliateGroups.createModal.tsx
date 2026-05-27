@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { X, Trash2 } from "lucide-react";
 import { mobbexService } from "../../api/mobbex.service";
+import { plansService } from "../../api/plans.service";
+import { promotersService } from "../../api/promoters.service";
 import {
   paymentGatewayOptions,
-  planOptions,
   provinceOptions,
-  promoterOptions,
   sellerOptions,
   cityOptions,
 } from "./AffiliateGroups.constants";
@@ -18,7 +18,10 @@ import type {
   CreateAffiliateGroupModalPayload,
   MobbexSubscriptionSummary,
   PaymentMode,
+  PaymentGatewayProvider,
 } from "./AffiliateGroups.types";
+import type { PlanResponse } from "../Plans/Plans.types";
+import type { PromoterResponse } from "../Promoters/Promoters.types";
 
 interface CreateAffiliateModalProps {
   isOpen: boolean;
@@ -71,6 +74,16 @@ function getOrCreatePaywayDeviceFingerprintId(): string {
   }
 }
 
+function formatPlanLabel(plan: PlanResponse): string {
+  const amount = Number(plan.monthlyFee);
+
+  return `${plan.name} - ${new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    minimumFractionDigits: 2,
+  }).format(Number.isNaN(amount) ? 0 : amount)}`;
+}
+
 const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   isOpen,
   onClose,
@@ -84,7 +97,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     Omit<AutomaticAffiliateGroupFormData, "mode" | "cardType">
   >({
     gateway: paymentGatewayOptions[0].value,
-    plan: planOptions[0],
+    plan: "",
+    planId: undefined,
     mobbexSubscriptionId: "",
     mobbexWebhook: "",
     paymentMethod: "card",
@@ -106,6 +120,12 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const [mobbexSubscriptions, setMobbexSubscriptions] = useState<
     MobbexSubscriptionSummary[]
   >([]);
+  const [localPlans, setLocalPlans] = useState<PlanResponse[]>([]);
+  const [localPromoters, setLocalPromoters] = useState<PromoterResponse[]>([]);
+  const [isLoadingLocalPlans, setIsLoadingLocalPlans] = useState(false);
+  const [isLoadingPromoters, setIsLoadingPromoters] = useState(false);
+  const [localPlansError, setLocalPlansError] = useState("");
+  const [promotersError, setPromotersError] = useState("");
   const [isLoadingMobbexSubscriptions, setIsLoadingMobbexSubscriptions] =
     useState(false);
   const [mobbexSubscriptionsError, setMobbexSubscriptionsError] = useState("");
@@ -116,9 +136,11 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const [cashData, setCashData] = useState<
     Omit<CashAffiliateGroupFormData, "mode" | "members">
   >({
-    promoter: promoterOptions[0],
+    promoterId: undefined,
+    promoterName: "",
     seller: sellerOptions[0],
-    plan: planOptions[0],
+    plan: "",
+    planId: undefined,
     city: cityOptions[0],
   });
 
@@ -143,12 +165,70 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
-    setAutoData((prev) => ({ ...prev, [name]: value }));
+    setAutoData((prev) => {
+      if (name === "gateway") {
+        const gateway = value as PaymentGatewayProvider;
+
+        if (gateway === "MOBBEX") {
+          return {
+            ...prev,
+            gateway,
+            planId: undefined,
+          };
+        }
+
+        const firstLocalPlan = localPlans[0];
+        return {
+          ...prev,
+          gateway,
+          planId: firstLocalPlan?.id,
+          plan: firstLocalPlan?.name ?? prev.plan,
+        };
+      }
+
+      if (name === "planId") {
+        const selectedPlan = localPlans.find(
+          (plan) => plan.id === Number(value),
+        );
+        return {
+          ...prev,
+          planId: selectedPlan?.id,
+          plan: selectedPlan?.name ?? prev.plan,
+        };
+      }
+
+      if (name === "promoterId") {
+        const selectedPromoter = localPromoters.find(
+          (promoter) => promoter.id === Number(value),
+        );
+
+        return {
+          ...prev,
+          promoterId: selectedPromoter?.id,
+          promoterName: selectedPromoter?.name ?? prev.promoterName,
+        };
+      }
+
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleCashChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setCashData((prev) => ({ ...prev, [name]: value }));
+    setCashData((prev) => {
+      if (name === "planId") {
+        const selectedPlan = localPlans.find(
+          (plan) => plan.id === Number(value),
+        );
+        return {
+          ...prev,
+          planId: selectedPlan?.id,
+          plan: selectedPlan?.name ?? prev.plan,
+        };
+      }
+
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleMobbexPlanChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -163,6 +243,124 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       plan: subscription?.name ?? prev.plan,
     }));
   };
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLocalPlans = async () => {
+      setIsLoadingLocalPlans(true);
+      setLocalPlansError("");
+
+      try {
+        const items = await plansService.list();
+        if (cancelled) {
+          return;
+        }
+
+        const activePlans = items.filter((plan) => plan.isActive);
+        setLocalPlans(activePlans);
+
+        const firstPlan = activePlans[0];
+
+        if (firstPlan) {
+          setAutoData((prev) => {
+            if (prev.gateway === "MOBBEX" || prev.planId) {
+              return prev;
+            }
+
+            return {
+              ...prev,
+              planId: firstPlan.id,
+              plan: firstPlan.name,
+            };
+          });
+
+          setCashData((prev) => {
+            if (prev.planId) {
+              return prev;
+            }
+
+            return {
+              ...prev,
+              planId: firstPlan.id,
+              plan: firstPlan.name,
+            };
+          });
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setLocalPlans([]);
+        setLocalPlansError(
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar los planes locales.",
+        );
+      } finally {
+        if (!cancelled) {
+          setIsLoadingLocalPlans(false);
+        }
+      }
+    };
+
+    const loadPromoters = async () => {
+      setIsLoadingPromoters(true);
+      setPromotersError("");
+
+      try {
+        const items = await promotersService.list();
+        if (cancelled) {
+          return;
+        }
+
+        const activePromoters = items.filter((promoter) => promoter.isActive);
+        setLocalPromoters(activePromoters);
+
+        const firstPromoter = activePromoters[0];
+        if (firstPromoter) {
+          setCashData((prev) => {
+            if (prev.promoterId) {
+              return prev;
+            }
+
+            return {
+              ...prev,
+              promoterId: firstPromoter.id,
+              promoterName: firstPromoter.name,
+            };
+          });
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setLocalPromoters([]);
+        setPromotersError(
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar los promotores.",
+        );
+      } finally {
+        if (!cancelled) {
+          setIsLoadingPromoters(false);
+        }
+      }
+    };
+
+    void loadLocalPlans();
+    void loadPromoters();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (mode !== "automatic") {
@@ -184,6 +382,23 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       };
     });
   }, [mode, autoData.gateway, autoData.deviceFingerprintId]);
+
+  useEffect(() => {
+    if (mode !== "automatic" || autoData.gateway === "MOBBEX") {
+      return;
+    }
+
+    if (autoData.planId || localPlans.length === 0) {
+      return;
+    }
+
+    const firstPlan = localPlans[0];
+    setAutoData((prev) => ({
+      ...prev,
+      planId: firstPlan.id,
+      plan: firstPlan.name,
+    }));
+  }, [mode, autoData.gateway, autoData.planId, localPlans]);
 
   useEffect(() => {
     if (!isOpen || mode !== "automatic" || autoData.gateway !== "MOBBEX") {
@@ -228,6 +443,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
           return {
             ...prev,
             plan: first.name,
+            planId: undefined,
             mobbexSubscriptionId: first.uid,
             mobbexWebhook: first.webhook,
           };
@@ -316,7 +532,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const resetForms = () => {
     setAutoData({
       gateway: paymentGatewayOptions[0].value,
-      plan: planOptions[0],
+      plan: localPlans[0]?.name ?? "",
+      planId: localPlans[0]?.id,
       mobbexSubscriptionId: "",
       mobbexWebhook: "",
       paymentMethod: "card",
@@ -336,13 +553,16 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       deviceFingerprintId: "",
     });
     setMobbexSubscriptions([]);
+    setLocalPlansError("");
     setMobbexSubscriptionsError("");
     setGeneratedMobbexLink("");
     setCopyFeedback("");
     setCashData({
-      promoter: promoterOptions[0],
+      promoterId: localPromoters[0]?.id,
+      promoterName: localPromoters[0]?.name ?? "",
       seller: sellerOptions[0],
-      plan: planOptions[0],
+      plan: localPlans[0]?.name ?? "",
+      planId: localPlans[0]?.id,
       city: cityOptions[0],
     });
     setMembers([
@@ -513,20 +733,33 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                   </select>
                 ) : (
                   <select
-                    name="plan"
-                    value={autoData.plan}
+                    name="planId"
+                    value={autoData.planId ? String(autoData.planId) : ""}
                     onChange={handleAutoChange}
+                    disabled={isLoadingLocalPlans || localPlans.length === 0}
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    {planOptions.map((plan) => (
-                      <option key={plan} value={plan}>
-                        {plan}
+                    {isLoadingLocalPlans && (
+                      <option value="">Cargando planes...</option>
+                    )}
+                    {!isLoadingLocalPlans && localPlans.length === 0 && (
+                      <option value="">No hay planes activos</option>
+                    )}
+                    {localPlans.map((plan) => (
+                      <option key={plan.id} value={String(plan.id)}>
+                        {formatPlanLabel(plan)}
                       </option>
                     ))}
                   </select>
                 )}
               </div>
             </div>
+
+            {autoData.gateway !== "MOBBEX" && localPlansError && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {localPlansError}
+              </div>
+            )}
 
             {autoData.gateway === "MOBBEX" && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-2">
@@ -841,17 +1074,29 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                   Promotor
                 </label>
                 <select
-                  name="promoter"
-                  value={cashData.promoter}
+                  name="promoterId"
+                  value={cashData.promoterId ? String(cashData.promoterId) : ""}
                   onChange={handleCashChange}
+                  disabled={isLoadingPromoters || localPromoters.length === 0}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {promoterOptions.map((prom) => (
-                    <option key={prom} value={prom}>
-                      {prom}
+                  {isLoadingPromoters && (
+                    <option value="">Cargando promotores...</option>
+                  )}
+                  {!isLoadingPromoters && localPromoters.length === 0 && (
+                    <option value="">No hay promotores activos</option>
+                  )}
+                  {localPromoters.map((promoter) => (
+                    <option key={promoter.id} value={String(promoter.id)}>
+                      {promoter.name}
                     </option>
                   ))}
                 </select>
+                {promotersError && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    {promotersError}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -879,13 +1124,20 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                 </label>
                 <select
                   name="plan"
-                  value={cashData.plan}
+                  value={cashData.planId ? String(cashData.planId) : ""}
                   onChange={handleCashChange}
+                  disabled={isLoadingLocalPlans || localPlans.length === 0}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {planOptions.map((plan) => (
-                    <option key={plan} value={plan}>
-                      {plan}
+                  {isLoadingLocalPlans && (
+                    <option value="">Cargando planes...</option>
+                  )}
+                  {!isLoadingLocalPlans && localPlans.length === 0 && (
+                    <option value="">No hay planes activos</option>
+                  )}
+                  {localPlans.map((plan) => (
+                    <option key={plan.id} value={String(plan.id)}>
+                      {formatPlanLabel(plan)}
                     </option>
                   ))}
                 </select>

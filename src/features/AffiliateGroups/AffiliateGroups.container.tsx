@@ -11,25 +11,14 @@ import {
   Wallet,
 } from "lucide-react";
 import type {
-  AffiliateGroupsRow,
   AffiliateStatus,
   CreateGroupSubmitResult,
   CreateAffiliateGroupModalPayload,
 } from "./AffiliateGroups.types";
-import {
-  affiliateRows,
-  MONTHS,
-  yearOptions,
-} from "./AffiliateGroups.constants";
+import { MONTHS, yearOptions } from "./AffiliateGroups.constants";
 import AffiliateGroupsCreateModal from "./AffiliateGroups.createModal";
 import type { AppDispatch, RootState } from "../../store/store";
 import { getGroupsThunk, onCreateGroupThunk } from "./AffiliateGroups.action";
-
-const STATUS_LABEL: Record<AffiliateStatus, string> = {
-  active: "Activo",
-  suspended: "Suspendido",
-  "no-coverage": "Sin Cobertura",
-};
 
 const STATUS_CLASS: Record<AffiliateStatus, string> = {
   active: "bg-emerald-100 text-emerald-700",
@@ -53,7 +42,6 @@ const AffiliateGroupsContainer: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const { data } = useSelector((state: RootState) => state.affiliateGroups);
-  console.log('container',data)
   const createGroupLoading = useSelector(
     (state: RootState) => state.affiliateGroups.createGroupLoading,
   );
@@ -65,14 +53,6 @@ const AffiliateGroupsContainer: React.FC = () => {
     "all" | "card" | "cbu" | "cash"
   >("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
-  const filteredRows = affiliateRows.filter((row) => {
-    const byDni =
-      !dni.trim() || row.dni.toLowerCase().includes(dni.trim().toLowerCase());
-    const byPayment =
-      paymentFilter === "all" || row.paymentMethod === paymentFilter;
-    return byDni && byPayment;
-  });
 
   const handleClear = () => {
     setDni("");
@@ -121,7 +101,7 @@ const AffiliateGroupsContainer: React.FC = () => {
           </button>
         </div>
       </header>
-       
+
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-3">
@@ -223,18 +203,31 @@ const AffiliateGroupsContainer: React.FC = () => {
               <tbody className="divide-y divide-slate-50">
                 {Array.isArray(data) && data.length > 0 ? (
                   data.map((group: any) => {
-                    const paymentTypeRaw = group.paymentMethods?.[0]?.type ?? "cash";
-                    const paymentType = paymentTypeRaw.toLowerCase() as keyof typeof PAYMENT_METHOD_ICON;
-                    const PaymentIcon = PAYMENT_METHOD_ICON[paymentType] ?? Wallet;
-                    const holder = group.affiliates?.find((a: any) => a.isHolder);
-                    
+                    const paymentTypeRaw =
+                      group.paymentMethods?.[0]?.type ?? "cash";
+                    const paymentType =
+                      paymentTypeRaw.toLowerCase() as keyof typeof PAYMENT_METHOD_ICON;
+                    const PaymentIcon =
+                      PAYMENT_METHOD_ICON[paymentType] ?? Wallet;
+                    const holder = group.affiliates?.find(
+                      (a: any) => a.isHolder,
+                    );
+
                     return (
-                      <tr key={group.id} className="hover:bg-slate-50 transition-colors">
+                      <tr
+                        key={group.id}
+                        className="hover:bg-slate-50 transition-colors"
+                      >
                         <td className="px-6 py-4 text-slate-400 font-medium">
                           {group.id}
                         </td>
                         <td className="px-4 py-4 font-semibold text-slate-900">
-                          {group.name}
+                          <div>{group.name}</div>
+                          {group.promoter?.name && (
+                            <div className="mt-1 text-xs font-medium text-slate-500">
+                              Promotor: {group.promoter.name}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-4 text-slate-700">
                           {group.holderFullName}
@@ -245,26 +238,27 @@ const AffiliateGroupsContainer: React.FC = () => {
                         <td className="px-4 py-4 text-slate-600 font-mono text-xs">
                           {holder?.documentNumber ?? "N/A"}
                         </td>
-                        <td className="px-4 py-4 text-slate-600">
-                          N/A
-                        </td>
+                        <td className="px-4 py-4 text-slate-600">N/A</td>
                         <td className="px-4 py-4 text-slate-600">
                           {group.plan?.name ?? "N/A"}
                         </td>
                         <td className="px-4 py-4 text-slate-700">
                           <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold">
                             <PaymentIcon className="w-3 h-3" />
-                            {PAYMENT_METHOD_LABEL[paymentType] ?? paymentTypeRaw}
+                            {PAYMENT_METHOD_LABEL[paymentType] ??
+                              paymentTypeRaw}
                           </span>
                         </td>
                         <td className="px-4 py-4">
-                          <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-semibold ${STATUS_CLASS[group.planStatus?.toLowerCase() as AffiliateStatus] ?? "bg-slate-100 text-slate-700"}`}>
+                          <span
+                            className={`inline-block px-2.5 py-1 rounded-lg text-xs font-semibold ${STATUS_CLASS[group.planStatus?.toLowerCase() as AffiliateStatus] ?? "bg-slate-100 text-slate-700"}`}
+                          >
                             {group.planStatus ?? "N/A"}
                           </span>
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex gap-0.5">
-                            {MONTHS.map((m, i) => (
+                            {MONTHS.map((m: string, i: number) => (
                               <span
                                 key={`${m}-${i}`}
                                 className="w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded bg-slate-100 text-slate-400"
@@ -288,7 +282,10 @@ const AffiliateGroupsContainer: React.FC = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={11} className="px-6 py-8 text-center text-slate-500">
+                    <td
+                      colSpan={11}
+                      className="px-6 py-8 text-center text-slate-500"
+                    >
                       No hay grupos disponibles
                     </td>
                   </tr>
@@ -306,7 +303,11 @@ const AffiliateGroupsContainer: React.FC = () => {
             </span>{" "}
             resultados
           </p>
-          <p>{Array.isArray(data) && data.length > 0 ? `1-${data.length} de ${data.length}` : "0 de 0"}</p>
+          <p>
+            {Array.isArray(data) && data.length > 0
+              ? `1-${data.length} de ${data.length}`
+              : "0 de 0"}
+          </p>
         </div>
       </div>
 

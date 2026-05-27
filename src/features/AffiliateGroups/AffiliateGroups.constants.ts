@@ -40,12 +40,6 @@ export const provinceOptions = [
   "Jujuy",
 ];
 
-export const promoterOptions = [
-  "Promotor 1 - Juan Pérez",
-  "Promotor 2 - María García",
-  "Promotor 3 - Carlos López",
-];
-
 export const sellerOptions = [
   "Vendedor 1 - Roberto Silva",
   "Vendedor 2 - Ana Martínez",
