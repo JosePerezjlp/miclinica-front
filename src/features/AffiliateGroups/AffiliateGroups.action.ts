@@ -13,7 +13,7 @@ import type {
   GroupResponse,
 } from "./AffiliateGroups.types";
 import type { RootState } from "../../store/store";
-import {familiarGroupGet} from "../../api/groups.service";
+import { familiarGroupGet } from "../../api/groups.service";
 
 function toDigits(value: string): string {
   return value.replace(/\D/g, "");
@@ -171,9 +171,8 @@ export const getGroupsThunk =
   async (dispatch) => {
     dispatch(onGetGroups());
     try {
-      const data = await familiarGroupGet.getGroups();
-      console.log(data)
-      dispatch(onGetGroupsSuccess([data]));
+      const groups = await familiarGroupGet.getGroups();
+      dispatch(onGetGroupsSuccess(groups));
    
     } catch (err: unknown) {
       const message =

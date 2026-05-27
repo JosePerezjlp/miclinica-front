@@ -2,6 +2,8 @@ import {
   CREATE_GROUP,
   CREATE_GROUP_ERROR,
   CREATE_GROUP_SUCCESS,
+  GET_GROUPS,
+  GET_GROUPS_ERROR,
   GET_GROUPS_SUCCESS,
 } from "./AffiliateGroups.action";
 import type { GroupResponse } from "./AffiliateGroups.types";
@@ -23,7 +25,7 @@ const initialState: AffiliateGroupsState = {
 
 type AffiliateGroupsAction = {
   type: string;
-  payload?: string | GroupResponse;
+  payload?: string | GroupResponse | GroupResponse[];
 };
 
 export const affiliateGroupsReducer = (
@@ -50,12 +52,22 @@ export const affiliateGroupsReducer = (
         createGroupLoading: false,
         createGroupError: (action.payload as string) ?? null,
       };
-  case GET_GROUPS_SUCCESS:
+    case GET_GROUPS:
       return {
-        ...state,      
-        data: (action.payload as string) ?? null,
+        ...state,
+        createGroupError: null,
       };
-      
+    case GET_GROUPS_SUCCESS:
+      return {
+        ...state,
+        data: (action.payload as GroupResponse[]) ?? [],
+      };
+    case GET_GROUPS_ERROR:
+      return {
+        ...state,
+        createGroupError: (action.payload as string) ?? null,
+        data: [],
+      };
     default:
       return state;
   }

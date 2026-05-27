@@ -197,6 +197,13 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
         };
       }
 
+      return { ...prev, [name]: value };
+    });
+  };
+
+  const handleCashChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setCashData((prev) => {
       if (name === "promoterId") {
         const selectedPromoter = localPromoters.find(
           (promoter) => promoter.id === Number(value),
@@ -209,13 +216,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
         };
       }
 
-      return { ...prev, [name]: value };
-    });
-  };
-
-  const handleCashChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setCashData((prev) => {
       if (name === "planId") {
         const selectedPlan = localPlans.find(
           (plan) => plan.id === Number(value),

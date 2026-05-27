@@ -6,11 +6,8 @@ import {
   Users,
   CreditCard,
   FileText,
-  TrendingUp,
   Edit2,
   Plus,
-  Trash2,
-  Calendar,
   DollarSign,
 } from 'lucide-react';
 import type { AppDispatch, RootState } from '../../store/store';

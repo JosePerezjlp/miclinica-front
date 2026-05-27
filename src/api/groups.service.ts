@@ -13,7 +13,7 @@ export const groupsService = {
 
 export const familiarGroupGet = {
   async getGroups() {
-    const { data } = await apiClient.get("/groups/familiarGroups");
-    return data[0];
-  }
-}
+    const { data } = await apiClient.get<GroupResponse[]>("/groups/familiarGroups");
+    return Array.isArray(data) ? data : [];
+  },
+};

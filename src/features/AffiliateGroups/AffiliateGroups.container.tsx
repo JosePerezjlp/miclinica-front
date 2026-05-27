@@ -201,8 +201,8 @@ const AffiliateGroupsContainer: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {Array.isArray(data) && data.length > 0 ? (
-                  data.map((group: any) => {
+                {Array.isArray(data) && data.filter(Boolean).length > 0 ? (
+                  data.filter(Boolean).map((group: any) => {
                     const paymentTypeRaw =
                       group.paymentMethods?.[0]?.type ?? "cash";
                     const paymentType =
