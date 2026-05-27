@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   BadgeCheck,
   CreditCard,
@@ -50,6 +51,7 @@ const PAYMENT_METHOD_ICON = {
 
 const AffiliateGroupsContainer: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const { data } = useSelector((state: RootState) => state.affiliateGroups);
   console.log('container',data)
   const createGroupLoading = useSelector(
@@ -82,6 +84,10 @@ const AffiliateGroupsContainer: React.FC = () => {
   ): Promise<CreateGroupSubmitResult | undefined> => {
     if (createGroupLoading) return undefined;
     return dispatch(onCreateGroupThunk(data));
+  };
+
+  const handleViewGroup = (groupId: number) => {
+    navigate(`/affiliate-groups/${groupId}`);
   };
 
   useEffect(() => {
@@ -271,6 +277,7 @@ const AffiliateGroupsContainer: React.FC = () => {
                         <td className="px-4 py-4 text-right">
                           <button
                             type="button"
+                            onClick={() => handleViewGroup(group.id)}
                             className="h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
                           >
                             Consultar

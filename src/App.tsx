@@ -4,6 +4,7 @@ import LoginContainer from "./features/Login/Login.container";
 import RegisterContainer from "./features/Register/Register.container";
 import DashboardContainer from "./features/Dashboard/Dashboard.container";
 import AffiliateGroupsContainer from "./features/AffiliateGroups/AffiliateGroups.container";
+import AffiliateGroupsDetailContainer from "./features/AffiliateGroups/AffiliateGroups.detail.container";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAppSelector } from "./store/hooks";
 
@@ -59,6 +60,16 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <AffiliateGroupsContainer />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/affiliate-groups/:id"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <AffiliateGroupsDetailContainer />
               </DashboardLayout>
             </ProtectedRoute>
           }

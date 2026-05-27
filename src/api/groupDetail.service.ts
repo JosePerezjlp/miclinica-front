@@ -1,0 +1,125 @@
+import type { GroupDetailData } from '../features/AffiliateGroups/AffiliateGroups.detail.types';
+import  apiClient  from './apiClient';
+
+// Helper to convert numeric strings to numbers in deeply nested objects
+const transformNumericStrings = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'string') {
+    const num = Number(obj);
+    return !isNaN(num) && obj.trim() !== '' ? num : obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(transformNumericStrings);
+  }
+  if (typeof obj === 'object') {
+    const transformed: any = {};
+    for (const key in obj) {
+      transformed[key] = transformNumericStrings(obj[key]);
+    }
+    return transformed;
+  }
+  return obj;
+};
+
+export const getGroupDetail = async (groupId: number): Promise<GroupDetailData> => {
+  const { data } = await apiClient.get(`/groups/${groupId}`);
+  return transformNumericStrings(data);
+};
+
+export const updateGroupInfo = async (
+  groupId: number,
+  payload: {
+    name?: string;
+    holderFullName?: string;
+    isActive?: boolean;
+  }
+): Promise<GroupDetailData> => {
+  const { data } = await apiClient.patch(`/groups/${groupId}`, payload);
+  return transformNumericStrings(data);
+};
+
+export const addAffiliate = async (
+  groupId: number,
+  payload: {
+    firstName: string;
+    lastName: string;
+    documentNumber: string;
+    birthDate: string;
+    isHolder?: boolean;
+  }
+): Promise<GroupDetailData> => {
+  const { data } = await apiClient.post(`/groups/${groupId}/affiliates`, payload);
+  return transformNumericStrings(data);
+};
+
+export const updateAffiliate = async (
+  groupId: number,
+  affiliateId: number,
+  payload: {
+    firstName?: string;
+    lastName?: string;
+    documentNumber?: string;
+    birthDate?: string;
+  }
+): Promise<GroupDetailData> => {
+  const { data } = await apiClient.patch(`/groups/${groupId}/affiliates/${affiliateId}`, payload);
+  return transformNumericStrings(data);
+};
+
+export const removeAffiliate = async (
+  groupId: number,
+  affiliateId: number
+): Promise<GroupDetailData> => {
+  const { data } = await apiClient.delete(`/groups/${groupId}/affiliates/${affiliateId}`);
+  return transformNumericStrings(data);
+};
+
+export const addPaymentMethod = async (
+  groupId: number,
+  payload: {
+    gateway: string;
+    type: string;
+    priority?: number;
+    last4?: string;
+    brand?: string;
+    holderName?: string;
+    expiresAt?: string;
+  }
+): Promise<GroupDetailData> => {
+  const { data } = await apiClient.post(`/groups/${groupId}/payment-methods`, payload);
+  return transformNumericStrings(data);
+};
+
+export const updatePaymentMethod = async (
+  groupId: number,
+  methodId: number,
+  payload: {
+    priority?: number;
+    isActive?: boolean;
+  }
+): Promise<GroupDetailData> => {
+  const { data } = await apiClient.patch(
+    `/groups/${groupId}/payment-methods/${methodId}`,
+    payload
+  );
+  return transformNumericStrings(data);
+};
+
+export const removePaymentMethod = async (
+  groupId: number,
+  methodId: number
+): Promise<GroupDetailData> => {
+  const { data } = await apiClient.delete(`/groups/${groupId}/payment-methods/${methodId}`);
+  return transformNumericStrings(data);
+};
+
+export const updatePlan = async (
+  groupId: number,
+  payload: {
+    planId?: number;
+    planStatus?: string;
+  }
+): Promise<GroupDetailData> => {
+  const { data } = await apiClient.patch(`/groups/${groupId}/plan`, payload);
+  return transformNumericStrings(data);
+};
