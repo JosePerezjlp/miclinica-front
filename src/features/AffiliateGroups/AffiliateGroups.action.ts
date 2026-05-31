@@ -10,6 +10,8 @@ import { mobbexService } from "../../api/mobbex.service";
 import type {
   CreateGroupSubmitResult,
   CreateAffiliateGroupModalPayload,
+  FamiliarGroupsFilters,
+  FamiliarGroupsPaginatedResponse,
   GroupResponse,
 } from "./AffiliateGroups.types";
 import type { RootState } from "../../store/store";
@@ -46,8 +48,6 @@ export const onCreateGroupError = (error: string) => ({
   type: CREATE_GROUP_ERROR as typeof CREATE_GROUP_ERROR,
   payload: error,
 });
-
-
 
 export const onCreateGroupThunk =
   (
@@ -125,9 +125,15 @@ export const onCreateGroupThunk =
           );
         }
       } else {
-        toast.success(
-          `Group #${group.id} created with ${group.affiliates.length} affiliate(s).`,
-        );
+        if (Number(payload.planAmount ?? 0) > 0) {
+          toast.success(
+            `Grupo #${group.id} creado con ${group.affiliates.length} afiliado(s) y pago efectivo registrado.`,
+          );
+        } else {
+          toast.success(
+            `Grupo #${group.id} creado con ${group.affiliates.length} afiliado(s). No se registró pago efectivo porque el plan no tiene monto válido.`,
+          );
+        }
       }
 
       return { group };
@@ -149,14 +155,16 @@ export const onCreateGroupThunk =
     }
   };
 
-  // Action constants
+// Action constants
 export const GET_GROUPS = "GET_GROUPS";
 export const GET_GROUPS_SUCCESS = "GET_GROUPS_SUCCESS";
 export const GET_GROUPS_ERROR = "GET_GROUPS_ERROR";
 
 // Action creators
 export const onGetGroups = () => ({ type: GET_GROUPS as typeof GET_GROUPS });
-export const onGetGroupsSuccess = (groups: GroupResponse[]) => ({
+export const onGetGroupsSuccess = (
+  groups: FamiliarGroupsPaginatedResponse,
+) => ({
   type: GET_GROUPS_SUCCESS as typeof GET_GROUPS_SUCCESS,
   payload: groups,
 });
@@ -167,19 +175,19 @@ export const onGetGroupsError = (error: string) => ({
 
 // Thunk
 export const getGroupsThunk =
-  (): ThunkAction<Promise<void>, RootState, unknown, Action> =>
+  (
+    filters: FamiliarGroupsFilters = {},
+  ): ThunkAction<Promise<void>, RootState, unknown, Action> =>
   async (dispatch) => {
     dispatch(onGetGroups());
     try {
-      const groups = await familiarGroupGet.getGroups();
+      const groups = await familiarGroupGet.getGroups(filters);
       dispatch(onGetGroupsSuccess(groups));
-   
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ?? "Error al iniciar sesión";
       toast.error(message);
       dispatch(onGetGroupsError(message));
-     
     }
   };

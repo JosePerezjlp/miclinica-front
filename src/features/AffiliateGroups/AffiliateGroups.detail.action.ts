@@ -90,7 +90,27 @@ export const addPaymentMethodThunk = createAsyncThunk<
   }
 >('groupDetail/addPaymentMethod', async ({ groupId, payload }, { rejectWithValue }) => {
   try {
-    return await groupDetailService.addPaymentMethod(groupId, payload);
+    const {
+      chargePendingNow,
+      amountDue,
+      mobbexSubscriptionId: _mobbexSubscriptionId,
+      mobbexWebhook: _mobbexWebhook,
+      ...paymentMethodPayload
+    } = payload;
+
+    await groupDetailService.addPaymentMethod(groupId, paymentMethodPayload);
+
+    if (
+      paymentMethodPayload.gateway !== 'MOBBEX' &&
+      chargePendingNow
+    ) {
+      await groupDetailService.runPaymentAttempt(groupId, {
+        amountDue:
+          typeof amountDue === 'number' && amountDue > 0 ? amountDue : undefined,
+      });
+    }
+
+    return await groupDetailService.getGroupDetail(groupId);
   } catch (error: any) {
     return rejectWithValue({
       message: error?.response?.data?.message || 'Error al agregar la forma de pago',
@@ -106,7 +126,8 @@ export const updatePaymentMethodThunk = createAsyncThunk<
   }
 >('groupDetail/updatePaymentMethod', async ({ groupId, methodId, payload }, { rejectWithValue }) => {
   try {
-    return await groupDetailService.updatePaymentMethod(groupId, methodId, payload);
+    await groupDetailService.updatePaymentMethod(groupId, methodId, payload);
+    return await groupDetailService.getGroupDetail(groupId);
   } catch (error: any) {
     return rejectWithValue({
       message: error?.response?.data?.message || 'Error al actualizar la forma de pago',
@@ -122,7 +143,8 @@ export const removePaymentMethodThunk = createAsyncThunk<
   }
 >('groupDetail/removePaymentMethod', async ({ groupId, methodId }, { rejectWithValue }) => {
   try {
-    return await groupDetailService.removePaymentMethod(groupId, methodId);
+    await groupDetailService.removePaymentMethod(groupId, methodId);
+    return await groupDetailService.getGroupDetail(groupId);
   } catch (error: any) {
     return rejectWithValue({
       message: error?.response?.data?.message || 'Error al eliminar la forma de pago',

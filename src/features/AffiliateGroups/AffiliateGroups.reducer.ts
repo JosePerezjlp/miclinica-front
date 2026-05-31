@@ -6,26 +6,37 @@ import {
   GET_GROUPS_ERROR,
   GET_GROUPS_SUCCESS,
 } from "./AffiliateGroups.action";
-import type { GroupResponse } from "./AffiliateGroups.types";
+import type {
+  FamiliarGroupsPaginatedResponse,
+  GroupResponse,
+} from "./AffiliateGroups.types";
 
 interface AffiliateGroupsState {
   createGroupLoading: boolean;
   createGroupError: string | null;
   lastCreatedGroup: GroupResponse | null;
-  data: GroupResponse[] | null | string;
+  loading: boolean;
+  data: GroupResponse[];
+  meta: FamiliarGroupsPaginatedResponse["meta"];
 }
 
 const initialState: AffiliateGroupsState = {
   createGroupLoading: false,
   createGroupError: null,
   lastCreatedGroup: null,
-  data: null,
+  loading: false,
+  data: [],
+  meta: {
+    page: 1,
+    pageSize: 10,
+    total: 0,
+    totalPages: 1,
+  },
 };
-
 
 type AffiliateGroupsAction = {
   type: string;
-  payload?: string | GroupResponse | GroupResponse[];
+  payload?: string | GroupResponse | FamiliarGroupsPaginatedResponse;
 };
 
 export const affiliateGroupsReducer = (
@@ -55,16 +66,22 @@ export const affiliateGroupsReducer = (
     case GET_GROUPS:
       return {
         ...state,
+        loading: true,
         createGroupError: null,
       };
-    case GET_GROUPS_SUCCESS:
+    case GET_GROUPS_SUCCESS: {
+      const payload = action.payload as FamiliarGroupsPaginatedResponse;
       return {
         ...state,
-        data: (action.payload as GroupResponse[]) ?? [],
+        loading: false,
+        data: payload?.items ?? [],
+        meta: payload?.meta ?? state.meta,
       };
+    }
     case GET_GROUPS_ERROR:
       return {
         ...state,
+        loading: false,
         createGroupError: (action.payload as string) ?? null,
         data: [],
       };

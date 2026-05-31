@@ -180,5 +180,13 @@ export function mapCashFormToCreateGroupRequest(
     planId: payload.planId,
     promoterId: payload.promoterId,
     affiliates: mapCashFormToAffiliateRequests(payload),
+    initialManualPayment:
+      Number(payload.planAmount ?? 0) > 0
+        ? buildCashSandboxPayment({
+            amount: Number(payload.planAmount),
+            createdBy: payload.seller,
+            notes: `Pago manual inicial en efectivo del plan ${payload.plan}`,
+          })
+        : undefined,
   };
 }

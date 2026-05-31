@@ -141,6 +141,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     seller: sellerOptions[0],
     plan: "",
     planId: undefined,
+    planAmount: undefined,
     city: cityOptions[0],
   });
 
@@ -224,6 +225,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
           ...prev,
           planId: selectedPlan?.id,
           plan: selectedPlan?.name ?? prev.plan,
+          planAmount: selectedPlan
+            ? Number(selectedPlan.monthlyFee)
+            : prev.planAmount,
         };
       }
 
@@ -288,6 +292,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               ...prev,
               planId: firstPlan.id,
               plan: firstPlan.name,
+              planAmount: Number(firstPlan.monthlyFee),
             };
           });
         }
@@ -399,6 +404,24 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       plan: firstPlan.name,
     }));
   }, [mode, autoData.gateway, autoData.planId, localPlans]);
+
+  useEffect(() => {
+    if (mode !== "cash") {
+      return;
+    }
+
+    if (cashData.planId || localPlans.length === 0) {
+      return;
+    }
+
+    const firstPlan = localPlans[0];
+    setCashData((prev) => ({
+      ...prev,
+      planId: firstPlan.id,
+      plan: firstPlan.name,
+      planAmount: Number(firstPlan.monthlyFee),
+    }));
+  }, [mode, cashData.planId, localPlans]);
 
   useEffect(() => {
     if (!isOpen || mode !== "automatic" || autoData.gateway !== "MOBBEX") {
@@ -563,6 +586,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       seller: sellerOptions[0],
       plan: localPlans[0]?.name ?? "",
       planId: localPlans[0]?.id,
+      planAmount: localPlans[0] ? Number(localPlans[0].monthlyFee) : undefined,
       city: cityOptions[0],
     });
     setMembers([
@@ -1123,7 +1147,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                   Planes
                 </label>
                 <select
-                  name="plan"
+                  name="planId"
                   value={cashData.planId ? String(cashData.planId) : ""}
                   onChange={handleCashChange}
                   disabled={isLoadingLocalPlans || localPlans.length === 0}

@@ -76,16 +76,8 @@ export const removeAffiliate = async (
 
 export const addPaymentMethod = async (
   groupId: number,
-  payload: {
-    gateway: string;
-    type: string;
-    priority?: number;
-    last4?: string;
-    brand?: string;
-    holderName?: string;
-    expiresAt?: string;
-  }
-): Promise<GroupDetailData> => {
+  payload: Record<string, unknown>,
+) => {
   const { data } = await apiClient.post(`/groups/${groupId}/payment-methods`, payload);
   return transformNumericStrings(data);
 };
@@ -101,6 +93,19 @@ export const updatePaymentMethod = async (
   const { data } = await apiClient.patch(
     `/groups/${groupId}/payment-methods/${methodId}`,
     payload
+  );
+  return transformNumericStrings(data);
+};
+
+export const runPaymentAttempt = async (
+  groupId: number,
+  payload: {
+    amountDue?: number;
+  },
+) => {
+  const { data } = await apiClient.post(
+    `/groups/${groupId}/payment-attempts/run-now`,
+    payload,
   );
   return transformNumericStrings(data);
 };

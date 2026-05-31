@@ -119,10 +119,26 @@ export interface AddPaymentMethodPayload {
   gateway: string;
   type: string;
   priority?: number;
+  rawToken?: string;
+  cardNumber?: string;
+  cvv?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
   last4?: string;
   brand?: string;
   holderName?: string;
-  expiresAt?: string;
+  documentNumber?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+  phone?: string;
+  deviceFingerprintId?: string;
+  mobbexSubscriptionId?: string;
+  mobbexWebhook?: string;
+  chargePendingNow?: boolean;
+  amountDue?: number;
 }
 
 export interface UpdatePaymentMethodPayload {
