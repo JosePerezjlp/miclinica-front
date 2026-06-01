@@ -1,13 +1,10 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   ChevronDown,
-  Clock,
-  CreditCard,
-  Landmark,
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
-import type { AuditTransactionsResponse, TransactionDetail } from "../Audit.types";
+import type { AuditTransactionsResponse } from "../Audit.types";
 import {
   TRANSACTION_KIND_LABELS,
   TRANSACTION_KIND_COLORS,
@@ -105,7 +102,7 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {data.data.map((transaction, idx) => {
+            {data.data.map((transaction) => {
               const isExpanded = expandedRows.has(transaction.id);
               const hasDetails =
                 transaction.billingPeriod ||

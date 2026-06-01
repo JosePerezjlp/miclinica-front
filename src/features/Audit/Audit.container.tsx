@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { ChevronDown, Download, Filter } from "lucide-react";
+import { Download, Filter } from "lucide-react";
 import type { AppDispatch, RootState } from "../../store/store";
 import {
   getAuditTransactionsThunk,
@@ -18,7 +18,6 @@ import {
 } from "./Audit.constants";
 import AuditTransactionsView from "./views/Audit.transactions";
 import AuditSummaryView from "./views/Audit.summary";
-import { affiliatesService } from "../../api/affiliates.service";
 import { promotersService } from "../../api/promoters.service";
 import { familiarGroupGet } from "../../api/groups.service";
 
@@ -44,7 +43,7 @@ const AuditContainer: React.FC = () => {
       try {
         setGroupsLoading(true);
         const response = await familiarGroupGet.getGroups();
-        const options = response.map((g: { id: number; name: string }) => ({
+        const options = response.items.map((g: { id: number; name: string }) => ({
           label: g.name,
           value: g.id,
         }));

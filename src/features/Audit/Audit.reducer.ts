@@ -1,4 +1,4 @@
-import type { PayloadAction } from "@reduxjs/toolkit";
+import type { AnyAction } from "redux";
 import type {
   AuditFiltersData,
   AuditSummary,
@@ -38,7 +38,7 @@ const initialState: AuditState = {
 
 export const auditReducer = (
   state = initialState,
-  action: PayloadAction<unknown>,
+  action: AnyAction,
 ): AuditState => {
   switch (action.type) {
     case GET_AUDIT_TRANSACTIONS:
