@@ -125,7 +125,7 @@ export const sideSections: DashboardSideSection[] = [
   {
     title: "Administracion",
     items: [
-      { label: "Auditoria", icon: Shield },
+      { label: "Auditoria", icon: Shield, path: "/audit" },
       { label: "Pagos Adelantados", icon: CalendarCheck },
       { label: "Control General", icon: ListChecks },
       { label: "Calificacion", icon: Star },

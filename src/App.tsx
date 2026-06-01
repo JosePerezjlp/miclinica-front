@@ -10,6 +10,7 @@ import UsersContainer from "./features/Users/Users.container";
 import RolesContainer from "./features/Roles/Roles.container";
 import ModulesContainer from "./features/Modules/Modules.container";
 import AffiliateGroupsDetailContainer from "./features/AffiliateGroups/AffiliateGroups.detail.container";
+import AuditContainer from "./features/Audit/Audit.container";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAppSelector } from "./store/hooks";
 
@@ -120,6 +121,16 @@ function App() {
           }
         />
         <Route
+          path="/audit"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <AuditContainer />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/affiliate-groups/:id"
           element={
             <ProtectedRoute>
@@ -132,6 +143,10 @@ function App() {
         <Route
           path="/grupos-afiliados"
           element={<Navigate to="/affiliate-groups" replace />}
+        />
+        <Route
+          path="/auditoria"
+          element={<Navigate to="/audit" replace />}
         />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />

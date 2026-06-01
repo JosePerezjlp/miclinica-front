@@ -8,6 +8,7 @@ import { usersReducer } from "../features/Users/Users.reducer";
 import { rolesReducer } from "../features/Roles/Roles.reducer";
 import { accessModulesReducer } from "../features/Modules/Modules.reducer";
 import groupDetailReducer from "../features/AffiliateGroups/AffiliateGroups.detail.reducer";
+import { auditReducer } from "../features/Audit/Audit.reducer";
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
     roles: rolesReducer,
     accessModules: accessModulesReducer,
     groupDetail: groupDetailReducer,
+    audit: auditReducer,
   },
 });
 
