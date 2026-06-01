@@ -1,5 +1,5 @@
-import { createSlice } from '@reduxjs/toolkit';
-import type { GroupDetailState } from './AffiliateGroups.detail.types';
+import { createSlice } from "@reduxjs/toolkit";
+import type { GroupDetailState } from "./AffiliateGroups.detail.types";
 import {
   getGroupDetailThunk,
   updateGroupInfoThunk,
@@ -9,8 +9,9 @@ import {
   addPaymentMethodThunk,
   updatePaymentMethodThunk,
   removePaymentMethodThunk,
+  setPaymentAutomationThunk,
   updatePlanThunk,
-} from './AffiliateGroups.detail.action';
+} from "./AffiliateGroups.detail.action";
 
 const initialState: GroupDetailState = {
   data: null,
@@ -19,7 +20,7 @@ const initialState: GroupDetailState = {
 };
 
 const groupDetailSlice = createSlice({
-  name: 'groupDetail',
+  name: "groupDetail",
   initialState,
   reducers: {
     clearGroupDetail: (state) => {
@@ -43,7 +44,7 @@ const groupDetailSlice = createSlice({
       })
       .addCase(getGroupDetailThunk.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Error desconocido';
+        state.error = action.payload?.message || "Error desconocido";
       })
 
       // Update Group Info
@@ -57,7 +58,7 @@ const groupDetailSlice = createSlice({
       })
       .addCase(updateGroupInfoThunk.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Error desconocido';
+        state.error = action.payload?.message || "Error desconocido";
       })
 
       // Add Affiliate
@@ -71,7 +72,7 @@ const groupDetailSlice = createSlice({
       })
       .addCase(addAffiliateThunk.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Error desconocido';
+        state.error = action.payload?.message || "Error desconocido";
       })
 
       // Update Affiliate
@@ -85,7 +86,7 @@ const groupDetailSlice = createSlice({
       })
       .addCase(updateAffiliateThunk.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Error desconocido';
+        state.error = action.payload?.message || "Error desconocido";
       })
 
       // Remove Affiliate
@@ -99,7 +100,7 @@ const groupDetailSlice = createSlice({
       })
       .addCase(removeAffiliateThunk.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Error desconocido';
+        state.error = action.payload?.message || "Error desconocido";
       })
 
       // Add Payment Method
@@ -113,7 +114,7 @@ const groupDetailSlice = createSlice({
       })
       .addCase(addPaymentMethodThunk.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Error desconocido';
+        state.error = action.payload?.message || "Error desconocido";
       })
 
       // Update Payment Method
@@ -127,7 +128,7 @@ const groupDetailSlice = createSlice({
       })
       .addCase(updatePaymentMethodThunk.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Error desconocido';
+        state.error = action.payload?.message || "Error desconocido";
       })
 
       // Remove Payment Method
@@ -141,7 +142,21 @@ const groupDetailSlice = createSlice({
       })
       .addCase(removePaymentMethodThunk.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Error desconocido';
+        state.error = action.payload?.message || "Error desconocido";
+      })
+
+      // Set Payment Automation
+      .addCase(setPaymentAutomationThunk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(setPaymentAutomationThunk.fulfilled, (state, action) => {
+        state.loading = false;
+        state.data = action.payload;
+      })
+      .addCase(setPaymentAutomationThunk.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || "Error desconocido";
       })
 
       // Update Plan
@@ -155,7 +170,7 @@ const groupDetailSlice = createSlice({
       })
       .addCase(updatePlanThunk.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Error desconocido';
+        state.error = action.payload?.message || "Error desconocido";
       });
   },
 });

@@ -313,9 +313,15 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
                     La proxima cuota se cobrara automaticamente.
                   </p>
                   <p className="mt-1 text-sm text-blue-700">
-                    Metodo programado: {nextAutomaticMethod?.gateway} {nextAutomaticMethod?.brand ? `- ${nextAutomaticMethod.brand}` : ""}
-                    {nextAutomaticMethod?.last4 ? ` •••• ${nextAutomaticMethod.last4}` : ""}.
-                    Solo se cobrara ahora si el operador ejecuta un cobro manual desde la gestion del grupo.
+                    Metodo programado: {nextAutomaticMethod?.gateway}{" "}
+                    {nextAutomaticMethod?.brand
+                      ? `- ${nextAutomaticMethod.brand}`
+                      : ""}
+                    {nextAutomaticMethod?.last4
+                      ? ` •••• ${nextAutomaticMethod.last4}`
+                      : ""}
+                    . Solo se cobrara ahora si el operador ejecuta un cobro
+                    manual desde la gestion del grupo.
                   </p>
                 </div>
 
