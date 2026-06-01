@@ -41,9 +41,8 @@ const PAYMENT_METHOD_ICON = {
 const AffiliateGroupsContainer: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const { data } = useSelector((state: RootState) => state.affiliateGroups);
-  const createGroupLoading = useSelector(
-    (state: RootState) => state.affiliateGroups.createGroupLoading,
+  const { data, meta, loading, createGroupLoading } = useSelector(
+    (state: RootState) => state.affiliateGroups,
   );
 
   const [dni, setDni] = useState("");
@@ -52,11 +51,13 @@ const AffiliateGroupsContainer: React.FC = () => {
   const [paymentFilter, setPaymentFilter] = useState<
     "all" | "card" | "cbu" | "cash"
   >("all");
+  const [page, setPage] = useState(1);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const handleClear = () => {
     setDni("");
     setPaymentFilter("all");
+    setPage(1);
   };
 
   const handleCreateAffiliate = async (
@@ -71,8 +72,19 @@ const AffiliateGroupsContainer: React.FC = () => {
   };
 
   useEffect(() => {
-    dispatch(getGroupsThunk());
-  }, [dispatch]);
+    dispatch(
+      getGroupsThunk({
+        page,
+        pageSize: meta.pageSize,
+        dni,
+        paymentType: paymentFilter,
+      }),
+    );
+  }, [dispatch, page, meta.pageSize, dni, paymentFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [dni, paymentFilter]);
 
   return (
     <div className="w-full px-6 py-6 space-y-5">
@@ -286,7 +298,9 @@ const AffiliateGroupsContainer: React.FC = () => {
                       colSpan={11}
                       className="px-6 py-8 text-center text-slate-500"
                     >
-                      No hay grupos disponibles
+                      {loading
+                        ? "Cargando grupos..."
+                        : "No hay grupos disponibles"}
                     </td>
                   </tr>
                 )}
@@ -298,16 +312,44 @@ const AffiliateGroupsContainer: React.FC = () => {
         <div className="px-6 py-3 border-t border-slate-100 text-sm text-slate-500 flex items-center justify-between">
           <p>
             Mostrando{" "}
-            <span className="font-semibold text-slate-700">
-              {Array.isArray(data) ? data.length : 0}
-            </span>{" "}
+            <span className="font-semibold text-slate-700">{data.length}</span>{" "}
             resultados
           </p>
-          <p>
-            {Array.isArray(data) && data.length > 0
-              ? `1-${data.length} de ${data.length}`
-              : "0 de 0"}
-          </p>
+          <div className="flex items-center gap-3">
+            <p>
+              {meta.total > 0
+                ? `${(meta.page - 1) * meta.pageSize + 1}-${Math.min(
+                    meta.page * meta.pageSize,
+                    meta.total,
+                  )} de ${meta.total}`
+                : "0 de 0"}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page <= 1 || loading}
+                className="h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              <span className="min-w-[64px] text-center text-slate-700 font-semibold">
+                {meta.page}/{meta.totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setPage((current) =>
+                    Math.min(meta.totalPages || 1, current + 1),
+                  )
+                }
+                disabled={page >= meta.totalPages || loading}
+                className="h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

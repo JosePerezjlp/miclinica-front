@@ -64,6 +64,7 @@ export interface CashAffiliateGroupFormData {
   seller: string;
   plan: string;
   planId?: number;
+  planAmount?: number;
   city: string;
   members: CashMember[];
 }
@@ -88,6 +89,7 @@ export interface CreateGroupRequest {
   planName?: string;
   affiliates: CreateAffiliateRequest[];
   paymentMethod?: CreateGroupPaymentMethodRequest;
+  initialManualPayment?: CreateManualPaymentRequest;
 }
 
 export interface GroupResponse {
@@ -106,6 +108,11 @@ export interface GroupResponse {
     isActive: boolean;
     isInternal: boolean;
   } | null;
+  plan?: {
+    id?: number;
+    name: string;
+  } | null;
+  planStatus?: string | null;
   affiliates: Array<{
     id: number;
     firstName: string;
@@ -133,6 +140,23 @@ export interface GroupResponse {
     success?: boolean;
     attemptId?: number;
     result?: string;
+  };
+}
+
+export interface FamiliarGroupsFilters {
+  page?: number;
+  pageSize?: number;
+  dni?: string;
+  paymentType?: "all" | "card" | "cbu" | "cash";
+}
+
+export interface FamiliarGroupsPaginatedResponse {
+  items: GroupResponse[];
+  meta: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
   };
 }
 
