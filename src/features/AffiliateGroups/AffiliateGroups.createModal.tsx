@@ -102,6 +102,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     mobbexSubscriptionId: "",
     mobbexWebhook: "",
     paymentMethod: "card",
+    cbu: "",
     cardNumber: "",
     cardMonth: "",
     cardYear: "",
@@ -169,12 +170,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     setAutoData((prev) => {
       if (name === "gateway") {
         const gateway = value as PaymentGatewayProvider;
+        const paymentMethod = gateway === "SIRO" ? "cbu" : "card";
 
         if (gateway === "MOBBEX") {
           return {
             ...prev,
             gateway,
             planId: undefined,
+            paymentMethod: "card",
           };
         }
 
@@ -182,6 +185,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
         return {
           ...prev,
           gateway,
+          paymentMethod,
           planId: firstLocalPlan?.id,
           plan: firstLocalPlan?.name ?? prev.plan,
         };
@@ -560,6 +564,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       mobbexSubscriptionId: "",
       mobbexWebhook: "",
       paymentMethod: "card",
+      cbu: "",
       cardNumber: "",
       cardMonth: "",
       cardYear: "",
@@ -673,7 +678,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
         {mode === "automatic" && (
           <form onSubmit={handleSubmitAuto} className="px-6 py-6 space-y-6">
             {/* Card type selection */}
-            {autoData.gateway !== "MOBBEX" && (
+            {autoData.paymentMethod === "card" && (
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-3">
                   Tipo de Tarjeta
@@ -847,20 +852,16 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Método de pago
                 </label>
-                <select
-                  name="paymentMethod"
-                  value={autoData.paymentMethod}
-                  onChange={handleAutoChange}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="card">Tarjeta</option>
-                  <option value="cbu">CBU</option>
-                </select>
+                <input
+                  value={autoData.gateway === "SIRO" ? "CBU" : "Tarjeta"}
+                  disabled
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-100 text-slate-600"
+                />
               </div>
             )}
 
             {/* Card details */}
-            {autoData.gateway !== "MOBBEX" && (
+            {autoData.paymentMethod === "card" && (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -923,6 +924,22 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                   </div>
                 </div>
               </>
+            )}
+
+            {autoData.paymentMethod === "cbu" && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  CBU
+                </label>
+                <input
+                  type="text"
+                  name="cbu"
+                  value={autoData.cbu}
+                  onChange={handleAutoChange}
+                  placeholder="Ingresá el CBU"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             )}
 
             {/* Personal info */}
@@ -1186,18 +1203,12 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
             </div>
 
             <div className="border-t border-slate-200 pt-6">
-              <div className="flex gap-2 mb-4">
+              <div className="mb-4">
                 <button
                   type="button"
-                  className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-colors"
+                  className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-colors"
                 >
                   CREAR AFILIADO
-                </button>
-                <button
-                  type="button"
-                  className="flex-1 h-10 border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-sm rounded-xl transition-colors"
-                >
-                  SELECCIONAR AFILIADO
                 </button>
               </div>
             </div>
@@ -1402,7 +1413,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                 type="submit"
                 className="flex-1 h-10 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-xl transition-colors"
               >
-                AGREGAR MIEMBRO
+                CREAR AFILIADO
               </button>
             </div>
           </form>

@@ -22,6 +22,9 @@ export function mapCashMemberToAffiliateRequest(
     lastName: member.lastName.trim(),
     documentNumber: toDigits(member.dni),
     birthDate: member.birthDate,
+    address: member.address.trim() || undefined,
+    email: member.email.trim() || undefined,
+    phone: member.phone.trim() || undefined,
     isHolder,
   };
 }
@@ -36,7 +39,9 @@ export function mapCashFormToAffiliateRequests(
 
 export function mapAutomaticFormToPaymentMethodRequest(input: {
   gateway: PaymentGatewayProvider;
+  paymentMethod: "card" | "cbu";
   priority?: number;
+  cbu?: string;
   cardNumber?: string;
   cardMonth?: string;
   cardYear?: string;
@@ -60,6 +65,26 @@ export function mapAutomaticFormToPaymentMethodRequest(input: {
       priority: input.priority ?? 1,
       holderName: `${input.firstName.trim()} ${input.lastName.trim()}`.trim(),
       brand: input.cardType,
+      documentNumber: input.documentNumber
+        ? toDigits(input.documentNumber)
+        : undefined,
+      email: input.email?.trim() || undefined,
+      address: input.address?.trim() || undefined,
+      city: input.city?.trim() || undefined,
+      province: input.province?.trim() || undefined,
+      postalCode: input.postalCode?.trim() || undefined,
+      phone: input.phone ? toDigits(input.phone) : undefined,
+    };
+  }
+
+  if (input.paymentMethod === "cbu") {
+    return {
+      gateway: input.gateway,
+      type: "CBU",
+      priority: input.priority ?? 1,
+      rawToken: toDigits(input.cbu ?? ""),
+      holderName: `${input.firstName.trim()} ${input.lastName.trim()}`.trim(),
+      brand: "CBU",
       documentNumber: input.documentNumber
         ? toDigits(input.documentNumber)
         : undefined,
@@ -139,12 +164,17 @@ export function mapAutomaticFormToCreateGroupRequest(
         lastName: holderLastName,
         documentNumber: toDigits(payload.dni),
         birthDate: new Date().toISOString(),
+        address: payload.address.trim() || undefined,
+        email: payload.email.trim() || undefined,
+        phone: payload.phone.trim() || undefined,
         isHolder: true,
       },
     ],
     paymentMethod: mapAutomaticFormToPaymentMethodRequest({
       gateway: payload.gateway,
+      paymentMethod: payload.paymentMethod,
       priority: 1,
+      cbu: payload.cbu,
       cardNumber: payload.cardNumber,
       cardMonth: payload.cardMonth,
       cardYear: payload.cardYear,

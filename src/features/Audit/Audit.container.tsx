@@ -43,10 +43,12 @@ const AuditContainer: React.FC = () => {
       try {
         setGroupsLoading(true);
         const response = await familiarGroupGet.getGroups();
-        const options = response.items.map((g: { id: number; name: string }) => ({
-          label: g.name,
-          value: g.id,
-        }));
+        const options = response.items.map(
+          (g: { id: number; name: string }) => ({
+            label: g.name,
+            value: g.id,
+          }),
+        );
         setFamiliarGroups(options);
       } catch (error) {
         console.error("Error loading familiar groups:", error);
@@ -93,7 +95,10 @@ const AuditContainer: React.FC = () => {
     }
   }, [filters, view, dispatch]);
 
-  const handleFilterChange = (key: keyof AuditFiltersData, value: number | undefined) => {
+  const handleFilterChange = (
+    key: keyof AuditFiltersData,
+    value: number | undefined,
+  ) => {
     const newFilters = {
       ...filters,
       [key]: value,
@@ -174,7 +179,10 @@ const AuditContainer: React.FC = () => {
             <select
               value={filters.familiarGroupId || ""}
               onChange={(e) =>
-                handleFilterChange("familiarGroupId", e.target.value ? parseInt(e.target.value, 10) : undefined)
+                handleFilterChange(
+                  "familiarGroupId",
+                  e.target.value ? parseInt(e.target.value, 10) : undefined,
+                )
               }
               disabled={groupsLoading}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm disabled:opacity-50"
@@ -196,7 +204,10 @@ const AuditContainer: React.FC = () => {
             <select
               value={filters.promoterId || ""}
               onChange={(e) =>
-                handleFilterChange("promoterId", e.target.value ? parseInt(e.target.value, 10) : undefined)
+                handleFilterChange(
+                  "promoterId",
+                  e.target.value ? parseInt(e.target.value, 10) : undefined,
+                )
               }
               disabled={promotersLoading}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm disabled:opacity-50"

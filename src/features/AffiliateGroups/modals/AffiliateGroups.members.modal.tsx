@@ -22,6 +22,9 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
     lastName: '',
     documentNumber: '',
     birthDate: '',
+    address: '',
+    email: '',
+    phone: '',
     isHolder: false,
   });
 
@@ -33,7 +36,7 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
       groupId: groupData.id,
       payload: formData,
     }));
-    setFormData({ firstName: '', lastName: '', documentNumber: '', birthDate: '', isHolder: false });
+    setFormData({ firstName: '', lastName: '', documentNumber: '', birthDate: '', address: '', email: '', phone: '', isHolder: false });
     setShowAddForm(false);
   };
 
@@ -132,6 +135,31 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  placeholder="Dirección"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <input
+                type="text"
+                placeholder="Teléfono"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -200,6 +228,31 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  placeholder="Dirección"
+                  value={editData.address || ''}
+                  onChange={(e) => setEditData({ ...editData, address: e.target.value })}
+                  className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={editData.email || ''}
+                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                  className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <input
+                type="text"
+                placeholder="Teléfono"
+                value={editData.phone || ''}
+                onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -236,6 +289,13 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
                   <p className="text-sm text-slate-500">
                     {affiliate.documentNumber} • {new Date(affiliate.birthDate).toLocaleDateString('es-AR')}
                   </p>
+                  {(affiliate.address || affiliate.email || affiliate.phone) && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      {affiliate.address || 'Sin dirección'}
+                      {affiliate.email ? ` • ${affiliate.email}` : ''}
+                      {affiliate.phone ? ` • ${affiliate.phone}` : ''}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button

@@ -41,6 +41,7 @@ export interface AutomaticAffiliateGroupFormData {
   mobbexSubscriptionId: string;
   mobbexWebhook?: string;
   paymentMethod: "card" | "cbu";
+  cbu: string;
   cardNumber: string;
   cardMonth: string;
   cardYear: string;
@@ -78,6 +79,9 @@ export interface CreateAffiliateRequest {
   lastName: string;
   documentNumber: string;
   birthDate: string;
+  address?: string;
+  email?: string;
+  phone?: string;
   isHolder?: boolean;
 }
 
@@ -119,6 +123,9 @@ export interface GroupResponse {
     lastName: string;
     documentNumber: string;
     birthDate: string;
+    address?: string | null;
+    email?: string | null;
+    phone?: string | null;
     isHolder: boolean;
     isActive: boolean;
   }>;
@@ -191,7 +198,11 @@ export interface CreateGroupSubmitResult {
 export interface UpdateAffiliateRequest {
   firstName?: string;
   lastName?: string;
+  documentNumber?: string;
   birthDate?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
   isActive?: boolean;
 }
 

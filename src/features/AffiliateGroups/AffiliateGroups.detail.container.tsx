@@ -18,6 +18,17 @@ import PaymentMethodsModal from "./modals/AffiliateGroups.paymentMethods.modal";
 import PlansModal from "./modals/AffiliateGroups.plans.modal";
 import BillingModal from "./modals/AffiliateGroups.billing.modal";
 
+type UnifiedRecentPayment = {
+  id: number;
+  amount: number;
+  month: number;
+  year: number;
+  status: string;
+  source: "PAYMENT" | "MANUAL_PAYMENT";
+  gatewayLabel: string;
+  eventDate: string;
+};
+
 const AffiliateGroupsDetailContainer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -71,7 +82,36 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
   const activeMethods =
     groupData.paymentMethods?.filter((m) => m.isActive) || [];
   const nextAutomaticMethod = activeMethods[0] ?? null;
-  const recentPayments = groupData.payments?.slice(0, 3) || [];
+  const recentPayments: UnifiedRecentPayment[] = [
+    ...(groupData.payments || []).map((payment) => ({
+      id: payment.id,
+      amount: Number(payment.amount || 0),
+      month: payment.month,
+      year: payment.year,
+      status: payment.status,
+      source: "PAYMENT" as const,
+      gatewayLabel: payment.gateway,
+      eventDate: payment.createdAt,
+    })),
+    ...(groupData.manualPayments || []).map((payment) => ({
+      id: payment.id,
+      amount: Number(payment.amount || 0),
+      month: payment.month,
+      year: payment.year,
+      status: "PAID",
+      source: "MANUAL_PAYMENT" as const,
+      gatewayLabel: payment.method,
+      eventDate: payment.paidAt || payment.createdAt,
+    })),
+  ]
+    .sort((left, right) => {
+      if (right.year !== left.year) return right.year - left.year;
+      if (right.month !== left.month) return right.month - left.month;
+      return (
+        new Date(right.eventDate).getTime() - new Date(left.eventDate).getTime()
+      );
+    })
+    .slice(0, 3);
   const billingBalance = groupData.currentAccount?.balance || 0;
 
   return (
@@ -431,12 +471,17 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
               <div className="space-y-3">
                 {recentPayments.map((payment) => (
                   <div
-                    key={payment.id}
+                    key={`${payment.source}-${payment.id}`}
                     className="flex items-center justify-between p-3 border border-slate-200 rounded-lg"
                   >
                     <div>
                       <p className="font-semibold text-slate-900">
-                        {payment.month}/{payment.year}
+                        {String(payment.month).padStart(2, "0")}/{payment.year}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {payment.source === "MANUAL_PAYMENT"
+                          ? `Manual • ${payment.gatewayLabel}`
+                          : payment.gatewayLabel}
                       </p>
                       <span
                         className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold ${
@@ -449,7 +494,7 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
                       </span>
                     </div>
                     <p className="font-semibold text-slate-900">
-                      ${payment.amount.toFixed(2)}
+                      ${Number(payment.amount).toFixed(2)}
                     </p>
                   </div>
                 ))}

@@ -1,9 +1,5 @@
 import React from "react";
-import {
-  ChevronDown,
-  AlertCircle,
-  CheckCircle,
-} from "lucide-react";
+import { ChevronDown, AlertCircle, CheckCircle } from "lucide-react";
 import type { AuditTransactionsResponse } from "../Audit.types";
 import {
   TRANSACTION_KIND_LABELS,
@@ -19,7 +15,9 @@ interface Props {
 }
 
 const AuditTransactionsView: React.FC<Props> = ({ data }) => {
-  const [expandedRows, setExpandedRows] = React.useState<Set<number>>(new Set());
+  const [expandedRows, setExpandedRows] = React.useState<Set<number>>(
+    new Set(),
+  );
 
   const toggleRow = (id: number) => {
     const newSet = new Set(expandedRows);
@@ -52,7 +50,9 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
     return (
       <div className="bg-white rounded-lg border border-slate-200 p-8">
         <div className="text-center text-slate-600">
-          <p>No hay transacciones registradas para los filtros seleccionados.</p>
+          <p>
+            No hay transacciones registradas para los filtros seleccionados.
+          </p>
         </div>
       </div>
     );
@@ -63,8 +63,12 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
       {/* Summary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 border-b border-slate-200">
         <div className="bg-slate-50 rounded-lg p-3">
-          <div className="text-xs text-slate-600 font-semibold">Total de Transacciones</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1">{data.total}</div>
+          <div className="text-xs text-slate-600 font-semibold">
+            Total de Transacciones
+          </div>
+          <div className="text-2xl font-bold text-slate-900 mt-1">
+            {data.total}
+          </div>
         </div>
         <div className="bg-red-50 rounded-lg p-3">
           <div className="text-xs text-red-700 font-semibold">Débitos</div>
@@ -79,11 +83,17 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
           </div>
         </div>
         <div className="bg-orange-50 rounded-lg p-3">
-          <div className="text-xs text-orange-700 font-semibold">Intentos Fallidos</div>
+          <div className="text-xs text-orange-700 font-semibold">
+            Intentos Fallidos
+          </div>
           <div className="text-2xl font-bold text-orange-700 mt-1">
-            {data.data.filter(
-              (t) => t.chargeAttempts && t.chargeAttempts.some((a) => a.result.startsWith("FAILED")),
-            ).length}
+            {
+              data.data.filter(
+                (t) =>
+                  t.chargeAttempts &&
+                  t.chargeAttempts.some((a) => a.result.startsWith("FAILED")),
+              ).length
+            }
           </div>
         </div>
       </div>
@@ -94,11 +104,21 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-4 py-3 text-left text-xs font-bold text-slate-700 w-8" />
-              <th className="px-4 py-3 text-left text-xs font-bold text-slate-700">Fecha</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-slate-700">Grupo</th>
-              <th className="px-4 py-3 text-left text-xs font-bold text-slate-700">Tipo de Movimiento</th>
-              <th className="px-4 py-3 text-right text-xs font-bold text-slate-700">Monto Capital</th>
-              <th className="px-4 py-3 text-right text-xs font-bold text-slate-700">Monto Interés</th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-slate-700">
+                Fecha
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-slate-700">
+                Grupo
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-bold text-slate-700">
+                Tipo de Movimiento
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-bold text-slate-700">
+                Monto Capital
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-bold text-slate-700">
+                Monto Interés
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -141,7 +161,8 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
                     <td className="px-4 py-3">
                       <span
                         className={`inline-block text-xs font-semibold ${
-                          TRANSACTION_KIND_COLORS[transaction.kind] || "text-slate-600"
+                          TRANSACTION_KIND_COLORS[transaction.kind] ||
+                          "text-slate-600"
                         }`}
                       >
                         {TRANSACTION_KIND_LABELS[transaction.kind] ||
@@ -187,17 +208,24 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
                                 <div>
                                   <span className="text-slate-600">Mes:</span>
                                   <div className="font-semibold text-slate-900">
-                                    {transaction.billingPeriod.month}/{transaction.billingPeriod.year}
+                                    {transaction.billingPeriod.month}/
+                                    {transaction.billingPeriod.year}
                                   </div>
                                 </div>
                                 <div>
-                                  <span className="text-slate-600">Monto Debido:</span>
+                                  <span className="text-slate-600">
+                                    Monto Debido:
+                                  </span>
                                   <div className="font-semibold text-slate-900">
-                                    {formatCurrency(transaction.billingPeriod.amountDue)}
+                                    {formatCurrency(
+                                      transaction.billingPeriod.amountDue,
+                                    )}
                                   </div>
                                 </div>
                                 <div className="sm:col-span-2">
-                                  <span className="text-slate-600">Estado:</span>
+                                  <span className="text-slate-600">
+                                    Estado:
+                                  </span>
                                   <div className="font-semibold text-slate-900">
                                     {transaction.billingPeriod.status}
                                   </div>
@@ -214,7 +242,9 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
                               </div>
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                                 <div>
-                                  <span className="text-slate-600">Método:</span>
+                                  <span className="text-slate-600">
+                                    Método:
+                                  </span>
                                   <div className="font-semibold text-slate-900">
                                     {MANUAL_PAYMENT_METHOD_LABELS[
                                       transaction.manualPayment.method
@@ -224,11 +254,15 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
                                 <div>
                                   <span className="text-slate-600">Monto:</span>
                                   <div className="font-semibold text-slate-900">
-                                    {formatCurrency(transaction.manualPayment.amount)}
+                                    {formatCurrency(
+                                      transaction.manualPayment.amount,
+                                    )}
                                   </div>
                                 </div>
                                 <div>
-                                  <span className="text-slate-600">Registrado por:</span>
+                                  <span className="text-slate-600">
+                                    Registrado por:
+                                  </span>
                                   <div className="font-semibold text-slate-900">
                                     {transaction.manualPayment.createdBy}
                                   </div>
@@ -236,13 +270,17 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
                                 <div>
                                   <span className="text-slate-600">Fecha:</span>
                                   <div className="font-semibold text-slate-900">
-                                    {formatDate(transaction.manualPayment.paidAt)}
+                                    {formatDate(
+                                      transaction.manualPayment.paidAt,
+                                    )}
                                   </div>
                                 </div>
                               </div>
                               {transaction.manualPayment.reference && (
                                 <div className="mt-2 text-sm">
-                                  <span className="text-slate-600">Referencia:</span>
+                                  <span className="text-slate-600">
+                                    Referencia:
+                                  </span>
                                   <div className="font-mono text-slate-900">
                                     {transaction.manualPayment.reference}
                                   </div>
@@ -252,57 +290,70 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
                           )}
 
                           {/* Charge Attempts */}
-                          {transaction.chargeAttempts && transaction.chargeAttempts.length > 0 && (
-                            <div className="bg-white rounded-lg p-3 border border-slate-200">
-                              <div className="text-xs font-bold text-slate-700 mb-3">
-                                INTENTOS DE COBRO ({transaction.chargeAttempts.length})
-                              </div>
-                              <div className="space-y-2">
-                                {transaction.chargeAttempts.map((attempt) => {
-                                  const isSuccess = attempt.result === "SUCCESS";
-                                  return (
-                                    <div
-                                      key={attempt.id}
-                                      className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm p-2 bg-slate-50 rounded border border-slate-200"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        {isSuccess ? (
-                                          <CheckCircle className="w-4 h-4 text-emerald-600" />
-                                        ) : (
-                                          <AlertCircle className="w-4 h-4 text-red-600" />
-                                        )}
-                                        <span className="font-semibold">
-                                          Intento {attempt.attemptNumber}
-                                        </span>
-                                      </div>
-                                      <span className="text-slate-600">
-                                        {PAYMENT_GATEWAY_LABELS[attempt.gateway] || attempt.gateway}
-                                      </span>
-                                      <span
-                                        className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                                          ATTEMPT_RESULT_COLORS[attempt.result] || "bg-slate-100"
-                                        }`}
+                          {transaction.chargeAttempts &&
+                            transaction.chargeAttempts.length > 0 && (
+                              <div className="bg-white rounded-lg p-3 border border-slate-200">
+                                <div className="text-xs font-bold text-slate-700 mb-3">
+                                  INTENTOS DE COBRO (
+                                  {transaction.chargeAttempts.length})
+                                </div>
+                                <div className="space-y-2">
+                                  {transaction.chargeAttempts.map((attempt) => {
+                                    const isSuccess =
+                                      attempt.result === "SUCCESS";
+                                    return (
+                                      <div
+                                        key={attempt.id}
+                                        className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm p-2 bg-slate-50 rounded border border-slate-200"
                                       >
-                                        {ATTEMPT_RESULT_LABELS[attempt.result] || attempt.result}
-                                      </span>
-                                      {attempt.amountCharged && (
-                                        <span className="ml-auto text-slate-900 font-semibold">
-                                          {formatCurrency(attempt.amountCharged)}
+                                        <div className="flex items-center gap-2">
+                                          {isSuccess ? (
+                                            <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                          ) : (
+                                            <AlertCircle className="w-4 h-4 text-red-600" />
+                                          )}
+                                          <span className="font-semibold">
+                                            Intento {attempt.attemptNumber}
+                                          </span>
+                                        </div>
+                                        <span className="text-slate-600">
+                                          {PAYMENT_GATEWAY_LABELS[
+                                            attempt.gateway
+                                          ] || attempt.gateway}
                                         </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+                                        <span
+                                          className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                                            ATTEMPT_RESULT_COLORS[
+                                              attempt.result
+                                            ] || "bg-slate-100"
+                                          }`}
+                                        >
+                                          {ATTEMPT_RESULT_LABELS[
+                                            attempt.result
+                                          ] || attempt.result}
+                                        </span>
+                                        {attempt.amountCharged && (
+                                          <span className="ml-auto text-slate-900 font-semibold">
+                                            {formatCurrency(
+                                              attempt.amountCharged,
+                                            )}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )}
 
                           {transaction.description && (
                             <div className="bg-white rounded-lg p-3 border border-slate-200">
                               <div className="text-xs font-bold text-slate-700 mb-2">
                                 DESCRIPCIÓN
                               </div>
-                              <p className="text-sm text-slate-900">{transaction.description}</p>
+                              <p className="text-sm text-slate-900">
+                                {transaction.description}
+                              </p>
                             </div>
                           )}
                         </div>

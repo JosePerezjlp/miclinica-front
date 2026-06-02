@@ -6,20 +6,17 @@ import type { AppDispatch, RootState } from "../../../store/store";
 import type { GroupDetailData } from "../AffiliateGroups.detail.types";
 import {
   addPaymentMethodThunk,
-  getGroupDetailThunk,
   removePaymentMethodThunk,
   setPaymentAutomationThunk,
   updatePaymentMethodThunk,
 } from "../AffiliateGroups.detail.action";
-import { mobbexService } from "../../../api/mobbex.service";
-import { paymentsService } from "../../../api/payments.service";
 
 interface PaymentMethodsModalProps {
   groupData: GroupDetailData;
   onClose: () => void;
 }
 
-const GATEWAY_OPTIONS = ["SIRO", "PAYWAY", "MOBBEX"] as const;
+const GATEWAY_OPTIONS = ["SIRO", "PAYWAY"] as const;
 
 const PAYWAY_DEVICE_FINGERPRINT_STORAGE_KEY =
   "miclinica.payway.deviceFingerprintId";
@@ -50,16 +47,6 @@ function getOrCreatePaywayDeviceFingerprintId(): string {
   return created;
 }
 
-function buildSubscriptionStartDate() {
-  const now = new Date();
-
-  return {
-    day: now.getDate(),
-    month: now.getMonth() + 1,
-    year: now.getFullYear(),
-  };
-}
-
 const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
   groupData,
   onClose,
@@ -71,9 +58,6 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [generatedMobbexLink, setGeneratedMobbexLink] = useState("");
-  const [mobbexSubscriptions, setMobbexSubscriptions] = useState<any[]>([]);
-  const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
   const [selectedPrimaryMethodId, setSelectedPrimaryMethodId] = useState<
     number | null
   >(null);
@@ -82,8 +66,9 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
   >([]);
 
   const [formData, setFormData] = useState({
-    gateway: "SIRO",
+    gateway: "PAYWAY",
     type: "CARD",
+    rawToken: "",
     priority: 1,
     cardNumber: "",
     cvv: "",
@@ -99,8 +84,6 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
     province: "",
     postalCode: "",
     phone: "",
-    mobbexSubscriptionId: "",
-    mobbexWebhook: "",
     chargePendingNow: false,
     amountDue:
       groupData.currentAccount?.balance && groupData.currentAccount.balance > 0
@@ -129,158 +112,59 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
     );
   }, [groupData.id, inactiveMethods]);
 
-  useEffect(() => {
-    if (!showAddForm || formData.gateway !== "MOBBEX") {
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadSubscriptions = async () => {
-      setLoadingSubscriptions(true);
-      try {
-        const items = await mobbexService.searchSubscriptions("");
-        if (cancelled) {
-          return;
-        }
-
-        setMobbexSubscriptions(items);
-        if (!formData.mobbexSubscriptionId && items[0]) {
-          setFormData((prev) => ({
-            ...prev,
-            mobbexSubscriptionId: items[0].uid,
-            mobbexWebhook: items[0].webhook ?? "",
-          }));
-        }
-      } catch (error) {
-        if (!cancelled) {
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : "No se pudieron cargar las suscripciones de Mobbex.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingSubscriptions(false);
-        }
-      }
-    };
-
-    void loadSubscriptions();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [showAddForm, formData.gateway, formData.mobbexSubscriptionId]);
-
   const handleAddMethod = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.gateway === "MOBBEX") {
-      if (!formData.mobbexSubscriptionId) {
-        toast.error("Seleccioná una suscripción de Mobbex.");
-        return;
-      }
+    const isSiro = formData.gateway === "SIRO";
 
-      const createdMethod = await paymentsService.createGroupPaymentMethod(
-        groupData.id,
-        {
-          gateway: "MOBBEX",
-          type: "CARD",
+    await dispatch(
+      addPaymentMethodThunk({
+        groupId: groupData.id,
+        payload: {
+          gateway: formData.gateway,
+          type: isSiro ? "CBU" : "CARD",
+          rawToken: isSiro ? formData.rawToken : undefined,
           priority: formData.priority,
-          brand: formData.brand || undefined,
+          cardNumber: isSiro ? undefined : formData.cardNumber,
+          cvv: isSiro ? undefined : formData.cvv,
+          expiryMonth: isSiro ? undefined : Number(formData.expiryMonth),
+          expiryYear: isSiro ? undefined : Number(formData.expiryYear),
+          last4: isSiro
+            ? formData.rawToken.replace(/\D/g, "").slice(-4)
+            : formData.cardNumber.replace(/\D/g, "").slice(-4),
+          brand: isSiro ? "CBU" : formData.brand || undefined,
           holderName: formData.holderName || groupData.holderFullName,
-        },
-      );
-
-      try {
-        const holderDocument =
-          formData.documentNumber ||
-          groupData.affiliates.find((affiliate) => affiliate.isHolder)
-            ?.documentNumber ||
-          "";
-
-        const subscriber = await mobbexService.createGroupSubscriber(
-          groupData.id,
-          formData.mobbexSubscriptionId,
-          {
-            customer: {
-              email:
-                formData.email.trim() ||
-                `pagos+fg-${groupData.id}@miclinica.local`,
-              name: formData.holderName.trim() || groupData.holderFullName,
-              identification: holderDocument.replace(/\D/g, ""),
-            },
-            startDate: buildSubscriptionStartDate(),
-            webhook: formData.mobbexWebhook || undefined,
-          },
-        );
-
-        if (!subscriber.result || !subscriber.sourceUrl) {
-          throw new Error(
-            subscriber.error ||
-              subscriber.code ||
-              "Mobbex no devolvió un link para completar la suscripción.",
-          );
-        }
-
-        setGeneratedMobbexLink(subscriber.sourceUrl);
-        await dispatch(getGroupDetailThunk(groupData.id)).unwrap();
-        toast.success(
-          "Tarjeta Mobbex preparada. Enviá el link al cliente para completar la adhesión.",
-        );
-      } catch (error) {
-        await paymentsService.deactivateGroupPaymentMethod(
-          groupData.id,
-          createdMethod.id,
-        );
-        throw error;
-      }
-    } else {
-      await dispatch(
-        addPaymentMethodThunk({
-          groupId: groupData.id,
-          payload: {
-            gateway: formData.gateway,
-            type: "CARD",
-            priority: formData.priority,
-            cardNumber: formData.cardNumber,
-            cvv: formData.cvv,
-            expiryMonth: Number(formData.expiryMonth),
-            expiryYear: Number(formData.expiryYear),
-            last4: formData.cardNumber.replace(/\D/g, "").slice(-4),
-            brand: formData.brand || undefined,
-            holderName: formData.holderName || groupData.holderFullName,
-            documentNumber: formData.documentNumber || undefined,
-            email: formData.email || undefined,
-            address: formData.address || undefined,
-            city: formData.city || undefined,
-            province: formData.province || undefined,
-            postalCode: formData.postalCode || undefined,
-            phone: formData.phone || undefined,
-            deviceFingerprintId:
-              formData.gateway === "PAYWAY"
-                ? getOrCreatePaywayDeviceFingerprintId()
-                : undefined,
-            chargePendingNow: formData.chargePendingNow,
-            amountDue: formData.chargePendingNow
-              ? Number(formData.amountDue)
+          documentNumber: formData.documentNumber || undefined,
+          email: formData.email || undefined,
+          address: formData.address || undefined,
+          city: formData.city || undefined,
+          province: formData.province || undefined,
+          postalCode: formData.postalCode || undefined,
+          phone: formData.phone || undefined,
+          deviceFingerprintId:
+            formData.gateway === "PAYWAY"
+              ? getOrCreatePaywayDeviceFingerprintId()
               : undefined,
-          },
-        }),
-      ).unwrap();
+          chargePendingNow: formData.chargePendingNow,
+          amountDue: formData.chargePendingNow
+            ? Number(formData.amountDue)
+            : undefined,
+        },
+      }),
+    ).unwrap();
 
-      toast.success(
-        formData.chargePendingNow
+    toast.success(
+      isSiro
+        ? "CBU agregado. Se usará desde la próxima cuota."
+        : formData.chargePendingNow
           ? "Tarjeta agregada y cobro pendiente ejecutado por decisión del operador."
           : "Tarjeta agregada. Se usará desde la próxima cuota.",
-      );
-    }
+    );
 
     setFormData({
-      gateway: "SIRO",
+      gateway: "PAYWAY",
       type: "CARD",
+      rawToken: "",
       priority: 1,
       cardNumber: "",
       cvv: "",
@@ -296,8 +180,6 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
       province: "",
       postalCode: "",
       phone: "",
-      mobbexSubscriptionId: "",
-      mobbexWebhook: "",
       chargePendingNow: false,
       amountDue:
         groupData.currentAccount?.balance &&
@@ -539,12 +421,9 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
                       setFormData({
                         ...formData,
                         gateway: e.target.value,
-                        mobbexSubscriptionId: "",
-                        mobbexWebhook: "",
-                        chargePendingNow:
-                          e.target.value === "MOBBEX"
-                            ? false
-                            : formData.chargePendingNow,
+                        type: e.target.value === "SIRO" ? "CBU" : "CARD",
+                        rawToken: "",
+                        chargePendingNow: formData.chargePendingNow,
                       })
                     }
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -561,7 +440,7 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
                     Tipo
                   </label>
                   <input
-                    value="CARD"
+                    value={formData.gateway === "SIRO" ? "CBU" : "CARD"}
                     disabled
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-100 text-slate-500 outline-none"
                   />
@@ -586,7 +465,7 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
                 />
               </div>
 
-              {formData.gateway !== "MOBBEX" && (
+              {formData.gateway === "PAYWAY" && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <input
@@ -774,45 +653,22 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
                 </>
               )}
 
-              {formData.gateway === "MOBBEX" && (
+              {formData.gateway === "SIRO" && (
                 <div className="space-y-4">
                   <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-slate-700">
-                    Mobbex no cobra en el alta de la tarjeta. Primero se genera
-                    la adhesión y el cliente debe completar el link de
-                    suscripción.
+                    SIRO se maneja solo con CBU desde este frontend.
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-900 mb-1">
-                      Suscripción Mobbex
-                    </label>
-                    <select
-                      value={formData.mobbexSubscriptionId}
-                      onChange={(e) => {
-                        const selected = mobbexSubscriptions.find(
-                          (item) => item.uid === e.target.value,
-                        );
-                        setFormData({
-                          ...formData,
-                          mobbexSubscriptionId: e.target.value,
-                          mobbexWebhook: selected?.webhook ?? "",
-                        });
-                      }}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      disabled={loadingSubscriptions}
-                    >
-                      <option value="">
-                        {loadingSubscriptions
-                          ? "Cargando suscripciones..."
-                          : "Seleccioná una suscripción"}
-                      </option>
-                      {mobbexSubscriptions.map((subscription) => (
-                        <option key={subscription.uid} value={subscription.uid}>
-                          {subscription.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="CBU"
+                    value={formData.rawToken}
+                    onChange={(e) =>
+                      setFormData({ ...formData, rawToken: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    required
+                  />
 
                   <div className="grid grid-cols-2 gap-4">
                     <input
@@ -847,20 +703,6 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
                     }
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   />
-
-                  {generatedMobbexLink && (
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 space-y-2">
-                      <p className="font-semibold">Link de adhesión generado</p>
-                      <a
-                        href={generatedMobbexLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="break-all text-blue-600 underline"
-                      >
-                        {generatedMobbexLink}
-                      </a>
-                    </div>
-                  )}
                 </div>
               )}
 

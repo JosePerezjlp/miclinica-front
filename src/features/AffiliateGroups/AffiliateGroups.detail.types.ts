@@ -42,6 +42,9 @@ export interface GroupDetailData {
     lastName: string;
     documentNumber: string;
     birthDate: string;
+    address?: string | null;
+    email?: string | null;
+    phone?: string | null;
     isHolder: boolean;
   }>;
   billingPeriods: Array<{
@@ -67,6 +70,20 @@ export interface GroupDetailData {
     gatewayTransactionId: string | null;
     billingPeriodId: number | null;
     chargeAttemptId: number | null;
+  }>;
+  manualPayments: Array<{
+    id: number;
+    familiarGroupId: number;
+    amount: number;
+    method: string;
+    paidAt: string;
+    month: number;
+    year: number;
+    reference: string | null;
+    notes: string | null;
+    createdBy: string;
+    createdAt: string;
+    updatedAt: string;
   }>;
   currentAccount: {
     id: number;
@@ -104,6 +121,9 @@ export interface AddAffiliatePayload {
   lastName: string;
   documentNumber: string;
   birthDate: string;
+  address?: string;
+  email?: string;
+  phone?: string;
   isHolder?: boolean;
 }
 
@@ -113,6 +133,9 @@ export interface UpdateAffiliatePayload {
   lastName?: string;
   documentNumber?: string;
   birthDate?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface AddPaymentMethodPayload {

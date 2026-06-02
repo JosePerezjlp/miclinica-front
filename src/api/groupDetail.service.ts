@@ -47,6 +47,9 @@ export const addAffiliate = async (
     lastName: string;
     documentNumber: string;
     birthDate: string;
+    address?: string;
+    email?: string;
+    phone?: string;
     isHolder?: boolean;
   },
 ): Promise<GroupDetailData> => {
@@ -65,6 +68,9 @@ export const updateAffiliate = async (
     lastName?: string;
     documentNumber?: string;
     birthDate?: string;
+    address?: string;
+    email?: string;
+    phone?: string;
   },
 ): Promise<GroupDetailData> => {
   const { data } = await apiClient.patch(
