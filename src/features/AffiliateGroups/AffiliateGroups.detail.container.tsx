@@ -29,6 +29,8 @@ type UnifiedRecentPayment = {
   eventDate: string;
 };
 
+const buildBillingPeriodKey = (month: number, year: number) => `${year}-${month}`;
+
 const AffiliateGroupsDetailContainer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -85,6 +87,17 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
   const billingPeriodById = new Map(
     (groupData.billingPeriods || []).map((period) => [period.id, period]),
   );
+  const paidByPeriodKey = new Map<string, number>();
+
+  for (const payment of groupData.payments || []) {
+    const key = buildBillingPeriodKey(payment.month, payment.year);
+    paidByPeriodKey.set(key, (paidByPeriodKey.get(key) ?? 0) + Number(payment.amount || 0));
+  }
+
+  for (const payment of groupData.manualPayments || []) {
+    const key = buildBillingPeriodKey(payment.month, payment.year);
+    paidByPeriodKey.set(key, (paidByPeriodKey.get(key) ?? 0) + Number(payment.amount || 0));
+  }
   const recentPayments: UnifiedRecentPayment[] = [
     ...(groupData.payments || []).map((payment) => ({
       id: payment.id,
@@ -124,7 +137,16 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
       );
     })
     .slice(0, 3);
-  const billingBalance = groupData.currentAccount?.balance || 0;
+  const computedPendingBalance = (groupData.billingPeriods || []).reduce(
+    (sum, period) => {
+      const key = buildBillingPeriodKey(period.month, period.year);
+      const paid = paidByPeriodKey.get(key) ?? 0;
+      return sum + Math.max(Number(period.amountDue || 0) - paid, 0);
+    },
+    0,
+  );
+  const billingBalance =
+    Number(groupData.currentAccount?.balanceCapital ?? computedPendingBalance) || 0;
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 px-6 py-6 space-y-6">

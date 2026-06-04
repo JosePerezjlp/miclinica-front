@@ -20,27 +20,57 @@ type UnifiedPaymentEntry = {
   gatewayTransactionId: string | null;
   reference: string | null;
   notes: string | null;
+  amountDue: number | null;
+  remainingAmount: number | null;
 };
+
+const buildBillingPeriodKey = (month: number, year: number) => `${year}-${month}`;
 
 const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
   const billingPeriodById = new Map(
     (groupData.billingPeriods || []).map((period) => [period.id, period]),
   );
+  const paidByPeriodKey = new Map<string, number>();
+
+  for (const payment of groupData.payments || []) {
+    const key = buildBillingPeriodKey(payment.month, payment.year);
+    paidByPeriodKey.set(key, (paidByPeriodKey.get(key) ?? 0) + Number(payment.amount || 0));
+  }
+
+  for (const payment of groupData.manualPayments || []) {
+    const key = buildBillingPeriodKey(payment.month, payment.year);
+    paidByPeriodKey.set(key, (paidByPeriodKey.get(key) ?? 0) + Number(payment.amount || 0));
+  }
+
   const unifiedPayments: UnifiedPaymentEntry[] = [
-    ...(groupData.payments || []).map((payment) => ({
-      id: payment.id,
-      source: "PAYMENT" as const,
-      amount: Number(payment.amount || 0),
-      month: payment.month,
-      year: payment.year,
-      status: payment.status,
-      channel: payment.gateway,
-      eventDate: payment.createdAt,
-      createdAt: payment.createdAt,
-      gatewayTransactionId: payment.gatewayTransactionId,
-      reference: null,
-      notes: null,
-    })),
+    ...(groupData.payments || []).map((payment) => {
+      const relatedPeriod = payment.billingPeriodId
+        ? billingPeriodById.get(payment.billingPeriodId)
+        : (groupData.billingPeriods || []).find(
+            (period) =>
+              period.month === payment.month && period.year === payment.year,
+          );
+      const amountDue = relatedPeriod ? Number(relatedPeriod.amountDue || 0) : null;
+      const periodPaid = paidByPeriodKey.get(buildBillingPeriodKey(payment.month, payment.year)) ?? Number(payment.amount || 0);
+
+      return {
+        id: payment.id,
+        source: "PAYMENT" as const,
+        amount: Number(payment.amount || 0),
+        month: payment.month,
+        year: payment.year,
+        status: payment.status,
+        channel: payment.gateway,
+        eventDate: payment.createdAt,
+        createdAt: payment.createdAt,
+        gatewayTransactionId: payment.gatewayTransactionId,
+        reference: null,
+        notes: null,
+        amountDue,
+        remainingAmount:
+          amountDue !== null ? Math.max(amountDue - periodPaid, 0) : null,
+      };
+    }),
     ...(groupData.manualPayments || []).map((payment) => {
       const relatedPeriod = payment.billingPeriodId
         ? billingPeriodById.get(payment.billingPeriodId)
@@ -48,6 +78,9 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
             (period) =>
               period.month === payment.month && period.year === payment.year,
           );
+
+      const amountDue = relatedPeriod ? Number(relatedPeriod.amountDue || 0) : null;
+      const periodPaid = paidByPeriodKey.get(buildBillingPeriodKey(payment.month, payment.year)) ?? Number(payment.amount || 0);
 
       return {
         id: payment.id,
@@ -62,6 +95,9 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
         gatewayTransactionId: null,
         reference: payment.reference,
         notes: payment.notes,
+        amountDue,
+        remainingAmount:
+          amountDue !== null ? Math.max(amountDue - periodPaid, 0) : null,
       };
     }),
   ].sort((left, right) => {
@@ -237,6 +273,12 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
                         <p className="text-lg font-bold text-slate-900">
                           ${payment.amount.toFixed(2)}
                         </p>
+                        {payment.remainingAmount !== null &&
+                          payment.remainingAmount > 0 && (
+                            <p className="mt-1 text-xs font-semibold text-amber-700">
+                              Pendiente: ${payment.remainingAmount.toFixed(2)}
+                            </p>
+                          )}
                         <span
                           className={`inline-block mt-1 px-2 py-1 rounded text-xs font-semibold ${
                             payment.status === "PAID"
@@ -251,6 +293,18 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-xs text-slate-600 pt-3 border-t border-slate-200">
+                      <div>
+                        <p className="text-slate-500">Cuota del período</p>
+                        <p>{payment.amountDue !== null ? `$${payment.amountDue.toFixed(2)}` : "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Saldo pendiente</p>
+                        <p>
+                          {payment.remainingAmount !== null
+                            ? `$${payment.remainingAmount.toFixed(2)}`
+                            : "—"}
+                        </p>
+                      </div>
                       <div>
                         <p className="text-slate-500">Canal</p>
                         <p className="font-mono">{payment.channel}</p>

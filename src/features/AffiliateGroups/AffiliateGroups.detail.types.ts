@@ -90,7 +90,9 @@ export interface GroupDetailData {
   currentAccount: {
     id: number;
     familiarGroupId: number;
-    balance: number;
+    balanceCapital: number;
+    balanceInterest: number;
+    advanceBalance: number;
     createdAt: string;
     updatedAt: string;
   } | null;

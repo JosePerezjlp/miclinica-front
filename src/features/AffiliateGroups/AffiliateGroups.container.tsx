@@ -313,7 +313,11 @@ const AffiliateGroupsContainer: React.FC = () => {
                         affiliates.map((affiliate: any, index: number) => (
                           <tr
                             key={`${group.id}-affiliate-${affiliate.id}`}
-                            className="bg-slate-50/70 text-slate-600"
+                            className={
+                              affiliate.isVerified
+                                ? "bg-emerald-50/80 text-slate-700"
+                                : "bg-rose-50/80 text-slate-700"
+                            }
                           >
                             <td className="px-6 py-3 text-slate-400 font-medium">
                               {index === 0 ? "" : ""}
@@ -364,9 +368,11 @@ const AffiliateGroupsContainer: React.FC = () => {
                               -
                             </td>
                             <td className="px-4 py-3">
-                              <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-200 text-slate-700">
-                                {affiliate.isActive ? "ACTIVO" : "INACTIVO"}
-                              </span>
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="text-[11px] font-medium text-slate-500">
+                                  {affiliate.isActive ? "ACTIVO" : "INACTIVO"}
+                                </span>
+                              </div>
                             </td>
                             <td className="px-4 py-3 text-right text-xs text-slate-400">
                               Afiliado

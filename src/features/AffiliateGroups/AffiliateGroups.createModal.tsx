@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
-import { affiliatesService, type AffiliateResponse } from "../../api/affiliates.service";
+import {
+  affiliatesService,
+  type AffiliateResponse,
+} from "../../api/affiliates.service";
 import { mobbexService } from "../../api/mobbex.service";
 import { paymentsService } from "../../api/payments.service";
 import { plansService } from "../../api/plans.service";
@@ -581,11 +584,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     };
   }, [mode, autoData.paymentMethod, autoData.cardNumber]);
 
-  const handleMemberChange = (
-    memberId: number,
-    field: keyof CashMember,
-    value: unknown,
-  ) => {
+  const handleMemberDraftChange = (field: keyof CashMember, value: string) => {
     setMemberDraft((prev) => ({ ...prev, [field]: value }));
     if (field === "dni") {
       setMemberFormError("");
@@ -620,9 +619,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     }
 
     try {
-      const existingAffiliates = await affiliatesService.findByDocumentNumber(
-        normalizedDni,
-      );
+      const existingAffiliates =
+        await affiliatesService.findByDocumentNumber(normalizedDni);
 
       if (existingAffiliates.length === 0) {
         return true;
@@ -671,8 +669,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
           ...prev,
           firstName: affiliate.firstName,
           lastName: affiliate.lastName,
-          birthDate:
-            formatDateForInput(affiliate.birthDate) || prev.birthDate,
+          birthDate: formatDateForInput(affiliate.birthDate) || prev.birthDate,
           dni: affiliate.documentNumber,
           address: affiliate.address || "",
           email: affiliate.email || "",
@@ -685,12 +682,13 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       closeDuplicateDniDialog();
 
       setTimeout(() => {
-        const form = context === "auto" 
-          ? autoFormRef.current 
-          : cashFormRef.current;
+        const form =
+          context === "auto" ? autoFormRef.current : cashFormRef.current;
 
         if (form) {
-          form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          form.dispatchEvent(
+            new Event("submit", { bubbles: true, cancelable: true }),
+          );
         }
       }, 100);
     } else {
@@ -784,18 +782,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       return;
     }
 
-    const confirmed = await confirmExistingAffiliateWithDni(
-      dniValue,
-      "member",
-    );
+    const confirmed = await confirmExistingAffiliateWithDni(dniValue, "member");
     if (!confirmed) {
       return;
     }
 
     const duplicate = members.some(
       (member) =>
-        normalizeDni(member.dni) === dniValue &&
-        member.id !== editingMemberId,
+        normalizeDni(member.dni) === dniValue && member.id !== editingMemberId,
     );
 
     if (duplicate) {
@@ -818,14 +812,13 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     if (editingMemberId !== null) {
       setMembers((prev) =>
         prev.map((member) =>
-          member.id === editingMemberId ? { ...newMember, id: editingMemberId } : member,
+          member.id === editingMemberId
+            ? { ...newMember, id: editingMemberId }
+            : member,
         ),
       );
     } else {
-      setMembers((prev) => [
-        ...prev,
-        { ...newMember, id: memberIdCounter },
-      ]);
+      setMembers((prev) => [...prev, { ...newMember, id: memberIdCounter }]);
       setMemberIdCounter((prev) => prev + 1);
     }
 
@@ -877,7 +870,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       cardType,
       ...autoData,
     };
-    
+
     const result = await onSubmit(submitData);
 
     if (autoData.gateway === "MOBBEX" && result?.mobbexSourceUrl) {
@@ -1042,7 +1035,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               EFECTIVO
             </button>
           </div>
-
         </div>
 
         {duplicateDniDialog && (
@@ -1052,7 +1044,10 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                 Afiliado existente encontrado
               </p>
               <p className="text-sm text-amber-700">
-                Ya existe un afiliado con DNI {duplicateDniDialog.dni}: {duplicateDniDialog.affiliate.firstName}{" "}{duplicateDniDialog.affiliate.lastName}. Está asociado al grupo #{duplicateDniDialog.affiliate.familiarGroupId}.
+                Ya existe un afiliado con DNI {duplicateDniDialog.dni}:{" "}
+                {duplicateDniDialog.affiliate.firstName}{" "}
+                {duplicateDniDialog.affiliate.lastName}. Está asociado al grupo
+                #{duplicateDniDialog.affiliate.familiarGroupId}.
               </p>
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
                 <button
@@ -1076,7 +1071,11 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
         {/* Automatic Payment Form */}
         {mode === "automatic" && (
-          <form ref={autoFormRef} onSubmit={handleSubmitAuto} className="px-6 py-6 space-y-6">
+          <form
+            ref={autoFormRef}
+            onSubmit={handleSubmitAuto}
+            className="px-6 py-6 space-y-6"
+          >
             {/* Card type selection */}
             {autoData.paymentMethod === "card" && (
               <div>
@@ -1516,7 +1515,11 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
         {/* Cash Payment Form */}
         {mode === "cash" && (
-          <form ref={cashFormRef} onSubmit={handleSubmitCash} className="px-6 py-6 space-y-6">
+          <form
+            ref={cashFormRef}
+            onSubmit={handleSubmitCash}
+            className="px-6 py-6 space-y-6"
+          >
             {/* Top selects */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1714,7 +1717,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                     </div>
                   )}
                   <p className="text-sm text-slate-600 mb-4">
-                    El primer miembro siempre es el titular. Puedes editar al titular desde la lista.
+                    El primer miembro siempre es el titular. Puedes editar al
+                    titular desde la lista.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
@@ -1821,7 +1825,10 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                         type="date"
                         value={memberDraft.inscriptionDate}
                         onChange={(e) =>
-                          handleMemberDraftChange("inscriptionDate", e.target.value)
+                          handleMemberDraftChange(
+                            "inscriptionDate",
+                            e.target.value,
+                          )
                         }
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
@@ -1896,7 +1903,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                         <p className="text-xs uppercase tracking-wide text-slate-500">
                           Teléfono
                         </p>
-                        <p className="text-sm text-slate-700">{member.phone || "-"}</p>
+                        <p className="text-sm text-slate-700">
+                          {member.phone || "-"}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-wide text-slate-500">

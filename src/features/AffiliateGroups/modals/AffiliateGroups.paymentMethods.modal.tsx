@@ -86,8 +86,9 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
     phone: "",
     chargePendingNow: false,
     amountDue:
-      groupData.currentAccount?.balance && groupData.currentAccount.balance > 0
-        ? Number(groupData.currentAccount.balance)
+      groupData.currentAccount?.balanceCapital &&
+      groupData.currentAccount.balanceCapital > 0
+        ? Number(groupData.currentAccount.balanceCapital)
         : Number(groupData.plan?.monthlyFee ?? 0),
   });
 
@@ -182,9 +183,9 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
       phone: "",
       chargePendingNow: false,
       amountDue:
-        groupData.currentAccount?.balance &&
-        groupData.currentAccount.balance > 0
-          ? Number(groupData.currentAccount.balance)
+        groupData.currentAccount?.balanceCapital &&
+        groupData.currentAccount.balanceCapital > 0
+          ? Number(groupData.currentAccount.balanceCapital)
           : Number(groupData.plan?.monthlyFee ?? 0),
     });
     setShowAddForm(false);
