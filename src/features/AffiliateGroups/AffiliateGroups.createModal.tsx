@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { X, Trash2 } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Plus, X } from "lucide-react";
+import { affiliatesService, type AffiliateResponse } from "../../api/affiliates.service";
 import { mobbexService } from "../../api/mobbex.service";
 import { plansService } from "../../api/plans.service";
 import { promotersService } from "../../api/promoters.service";
@@ -33,6 +34,18 @@ interface CreateAffiliateModalProps {
     | CreateGroupSubmitResult
     | undefined;
 }
+
+const emptyCashMember: CashMember = {
+  id: 0,
+  firstName: "",
+  lastName: "",
+  birthDate: "",
+  dni: "",
+  address: "",
+  email: "",
+  phone: "",
+  inscriptionDate: "",
+};
 
 const PAYWAY_DEVICE_FINGERPRINT_STORAGE_KEY =
   "miclinica.payway.deviceFingerprintId";
@@ -146,27 +159,32 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     city: cityOptions[0],
   });
 
-  const [members, setMembers] = useState<CashMember[]>([
-    {
-      id: 1,
-      firstName: "",
-      lastName: "",
-      birthDate: "",
-      dni: "",
-      address: "",
-      email: "",
-      phone: "",
-      inscriptionDate: "",
-      validated: false,
-    },
-  ]);
-
-  const [memberIdCounter, setMemberIdCounter] = useState(2);
+  const [members, setMembers] = useState<CashMember[]>([]);
+  const [memberDraft, setMemberDraft] = useState<CashMember>(emptyCashMember);
+  const [showMemberForm, setShowMemberForm] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
+  const [memberFormError, setMemberFormError] = useState("");
+  const [cashError, setCashError] = useState("");
+  const [autoError, setAutoError] = useState("");
+  const [memberIdCounter, setMemberIdCounter] = useState(1);
+  const [duplicateDniDialog, setDuplicateDniDialog] = useState<{
+    context: "auto" | "member";
+    dni: string;
+    affiliate: AffiliateResponse;
+  } | null>(null);
+  const duplicateDniResolver = useRef<((value: boolean) => void) | null>(null);
+  const autoFormRef = useRef<HTMLFormElement | null>(null);
+  const cashFormRef = useRef<HTMLFormElement | null>(null);
 
   const handleAutoChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
+
+    if (name === "dni") {
+      setAutoError("");
+    }
+
     setAutoData((prev) => {
       if (name === "gateway") {
         const gateway = value as PaymentGatewayProvider;
@@ -500,44 +518,303 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     };
   }, [isOpen, mode, autoData.gateway]);
 
-  const handleMemberChange = (
-    memberId: number,
+  const handleMemberDraftChange = (
     field: keyof CashMember,
     value: unknown,
   ) => {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === memberId ? { ...m, [field]: value } : m)),
-    );
+    setMemberDraft((prev) => ({ ...prev, [field]: value }));
+    if (field === "dni") {
+      setMemberFormError("");
+    }
   };
 
-  const addMember = () => {
-    setMembers((prev) => [
-      ...prev,
-      {
-        id: memberIdCounter,
-        firstName: "",
-        lastName: "",
-        birthDate: "",
-        dni: "",
-        address: "",
-        email: "",
-        phone: "",
-        inscriptionDate: "",
-        validated: false,
-      },
-    ]);
-    setMemberIdCounter((prev) => prev + 1);
+  const formatDateForInput = (dateString: string | undefined | null) => {
+    if (!dateString) {
+      return "";
+    }
+
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const year = date.getUTCFullYear();
+    const month = pad(date.getUTCMonth() + 1);
+    const day = pad(date.getUTCDate());
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const confirmExistingAffiliateWithDni = async (
+    dni: string,
+    context: "auto" | "member",
+  ) => {
+    const normalizedDni = normalizeDni(dni);
+    if (!normalizedDni) {
+      return true;
+    }
+
+    try {
+      const existingAffiliates = await affiliatesService.findByDocumentNumber(
+        normalizedDni,
+      );
+
+      if (existingAffiliates.length === 0) {
+        return true;
+      }
+
+      const [affiliate] = existingAffiliates;
+      return new Promise<boolean>((resolve) => {
+        duplicateDniResolver.current = resolve;
+        setDuplicateDniDialog({
+          context,
+          dni: normalizedDni,
+          affiliate,
+        });
+      });
+    } catch (error) {
+      console.error("Error verificando afiliado existente:", error);
+      return true;
+    }
+  };
+
+  const closeDuplicateDniDialog = () => {
+    setDuplicateDniDialog(null);
+    duplicateDniResolver.current = null;
+  };
+
+  const handleConfirmDuplicateDni = async () => {
+    if (duplicateDniDialog) {
+      const affiliate = duplicateDniDialog.affiliate;
+      const context = duplicateDniDialog.context;
+
+      await affiliatesService.removeById(affiliate.id);
+
+      if (context === "auto") {
+        setAutoData((prev) => ({
+          ...prev,
+          firstName: affiliate.firstName,
+          lastName: affiliate.lastName,
+          dni: affiliate.documentNumber,
+          email: affiliate.email || "",
+          address: affiliate.address || "",
+          phone: affiliate.phone || "",
+        }));
+        setAutoError("");
+      } else {
+        setMemberDraft((prev) => ({
+          ...prev,
+          firstName: affiliate.firstName,
+          lastName: affiliate.lastName,
+          birthDate:
+            formatDateForInput(affiliate.birthDate) || prev.birthDate,
+          dni: affiliate.documentNumber,
+          address: affiliate.address || "",
+          email: affiliate.email || "",
+          phone: affiliate.phone || "",
+        }));
+        setMemberFormError("");
+      }
+
+      duplicateDniResolver.current?.(true);
+      closeDuplicateDniDialog();
+
+      setTimeout(() => {
+        const form = context === "auto" 
+          ? autoFormRef.current 
+          : cashFormRef.current;
+
+        if (form) {
+          form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        }
+      }, 100);
+    } else {
+      duplicateDniResolver.current?.(true);
+      closeDuplicateDniDialog();
+    }
+  };
+
+  const handleCancelDuplicateDni = () => {
+    duplicateDniResolver.current?.(false);
+    if (duplicateDniDialog?.context === "auto") {
+      setAutoError("El DNI ya existe en otro afiliado.");
+      setAutoData((prev) => ({ ...prev, dni: "" }));
+    } else {
+      setMemberFormError("El DNI ya existe en otro afiliado.");
+    }
+    closeDuplicateDniDialog();
+  };
+
+  const handleAutoDniBlur = async () => {
+    if (!autoData.dni.trim()) {
+      return;
+    }
+
+    const confirmed = await confirmExistingAffiliateWithDni(
+      autoData.dni,
+      "auto",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setAutoError("");
+  };
+
+  const handleMemberDniBlur = async () => {
+    if (!memberDraft.dni.trim()) {
+      return;
+    }
+
+    const confirmed = await confirmExistingAffiliateWithDni(
+      memberDraft.dni,
+      "member",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setMemberFormError("");
+  };
+
+  const openMemberForm = (member?: CashMember) => {
+    setMemberFormError("");
+
+    if (member) {
+      setMemberDraft(member);
+      setEditingMemberId(member.id);
+    } else {
+      setMemberDraft(emptyCashMember);
+      setEditingMemberId(null);
+    }
+
+    setShowMemberForm(true);
+  };
+
+  const closeMemberForm = () => {
+    setShowMemberForm(false);
+    setEditingMemberId(null);
+    setMemberDraft(emptyCashMember);
+    setMemberFormError("");
+  };
+
+  const normalizeDni = (dni: string) => dni.replace(/\D/g, "");
+
+  const saveMember = async () => {
+    const firstName = memberDraft.firstName.trim();
+    const lastName = memberDraft.lastName.trim();
+    const dniValue = normalizeDni(memberDraft.dni);
+    const birthDate = memberDraft.birthDate.trim();
+
+    if (!firstName || !lastName || !dniValue || !birthDate) {
+      setMemberFormError(
+        "Completa Nombre, Apellido, DNI y Fecha de Nacimiento antes de guardar.",
+      );
+      return;
+    }
+
+    const parsedDate = new Date(birthDate);
+    if (Number.isNaN(parsedDate.getTime())) {
+      setMemberFormError("La Fecha de Nacimiento no es válida.");
+      return;
+    }
+
+    const confirmed = await confirmExistingAffiliateWithDni(
+      dniValue,
+      "member",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const duplicate = members.some(
+      (member) =>
+        normalizeDni(member.dni) === dniValue &&
+        member.id !== editingMemberId,
+    );
+
+    if (duplicate) {
+      setMemberFormError("El DNI ya existe en otro miembro.");
+      return;
+    }
+
+    const newMember = {
+      ...memberDraft,
+      firstName,
+      lastName,
+      dni: dniValue,
+      birthDate: birthDate,
+      address: memberDraft.address.trim(),
+      email: memberDraft.email.trim(),
+      phone: memberDraft.phone.trim(),
+      inscriptionDate: memberDraft.inscriptionDate.trim(),
+    };
+
+    if (editingMemberId !== null) {
+      setMembers((prev) =>
+        prev.map((member) =>
+          member.id === editingMemberId ? { ...newMember, id: editingMemberId } : member,
+        ),
+      );
+    } else {
+      setMembers((prev) => [
+        ...prev,
+        { ...newMember, id: memberIdCounter },
+      ]);
+      setMemberIdCounter((prev) => prev + 1);
+    }
+
+    closeMemberForm();
   };
 
   const removeMember = (memberId: number) => {
-    if (members.length > 1) {
-      setMembers((prev) => prev.filter((m) => m.id !== memberId));
+    setMembers((prev) => prev.filter((m) => m.id !== memberId));
+  };
+
+  const validateCashMembers = (): string | null => {
+    if (members.length === 0) {
+      return "Agregá al menos un miembro al grupo.";
     }
+
+    const seen = new Set<string>();
+
+    for (let index = 0; index < members.length; index += 1) {
+      const member = members[index];
+      const firstName = member.firstName.trim();
+      const lastName = member.lastName.trim();
+      const dniValue = normalizeDni(member.dni);
+      const birthDate = member.birthDate.trim();
+
+      if (!firstName || !lastName || !dniValue || !birthDate) {
+        return `Completa Nombre, Apellido, DNI y Fecha de Nacimiento en el miembro ${index + 1}.`;
+      }
+
+      const parsedDate = new Date(birthDate);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return `La Fecha de Nacimiento del miembro ${index + 1} no es válida.`;
+      }
+
+      if (seen.has(dniValue)) {
+        return `El DNI del miembro ${index + 1} coincide con otro miembro.`;
+      }
+
+      seen.add(dniValue);
+    }
+
+    return null;
   };
 
   const handleSubmitAuto = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = await onSubmit({ mode: "automatic", cardType, ...autoData });
+
+    const submitData = {
+      mode: "automatic" as const,
+      cardType,
+      ...autoData,
+    };
+    
+    const result = await onSubmit(submitData);
 
     if (autoData.gateway === "MOBBEX" && result?.mobbexSourceUrl) {
       setGeneratedMobbexLink(result.mobbexSourceUrl);
@@ -551,10 +828,35 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
   const handleSubmitCash = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSubmit({ mode: "cash", ...cashData, members });
+    setCashError("");
+
+    const validationError = validateCashMembers();
+    if (validationError) {
+      setCashError(validationError);
+      return;
+    }
+
+    const submitData = {
+      mode: "cash" as const,
+      ...cashData,
+      members,
+    };
+
+    await onSubmit(submitData);
     resetForms();
     onClose();
   };
+
+  const handleClose = () => {
+    resetForms();
+    onClose();
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetForms();
+    }
+  }, [isOpen]);
 
   const resetForms = () => {
     setAutoData({
@@ -594,21 +896,13 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       planAmount: localPlans[0] ? Number(localPlans[0].monthlyFee) : undefined,
       city: cityOptions[0],
     });
-    setMembers([
-      {
-        id: 1,
-        firstName: "",
-        lastName: "",
-        birthDate: "",
-        dni: "",
-        address: "",
-        email: "",
-        phone: "",
-        inscriptionDate: "",
-        validated: false,
-      },
-    ]);
-    setMemberIdCounter(2);
+    setMembers([]);
+    setMemberDraft(emptyCashMember);
+    setShowMemberForm(false);
+    setMemberFormError("");
+    setCashError("");
+    setEditingMemberId(null);
+    setMemberIdCounter(1);
   };
 
   if (!isOpen) return null;
@@ -640,7 +934,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
             Crear Grupo de Afiliados
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             type="button"
             className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
           >
@@ -649,34 +943,66 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
         </div>
 
         {/* Mode tabs */}
-        <div className="flex gap-3 px-6 pt-6 pb-4 border-b border-slate-100">
-          <button
-            type="button"
-            onClick={() => setMode("automatic")}
-            className={`flex-1 h-10 rounded-xl font-bold text-sm transition-all ${
-              mode === "automatic"
-                ? "bg-slate-600 hover:bg-slate-700 text-white shadow-md"
-                : "bg-slate-200 hover:bg-slate-300 text-slate-700"
-            }`}
-          >
-            AUTOMÁTICO
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("cash")}
-            className={`flex-1 h-10 rounded-xl font-bold text-sm transition-all ${
-              mode === "cash"
-                ? "bg-cyan-500 hover:bg-cyan-600 text-white shadow-md"
-                : "bg-slate-200 hover:bg-slate-300 text-slate-700"
-            }`}
-          >
-            EFECTIVO
-          </button>
+        <div className="flex flex-col gap-3 px-6 pt-6 pb-4 border-b border-slate-100 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-3 flex-1">
+            <button
+              type="button"
+              onClick={() => setMode("automatic")}
+              className={`flex-1 h-10 rounded-xl font-bold text-sm transition-all ${
+                mode === "automatic"
+                  ? "bg-slate-600 hover:bg-slate-700 text-white shadow-md"
+                  : "bg-slate-200 hover:bg-slate-300 text-slate-700"
+              }`}
+            >
+              AUTOMÁTICO
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("cash")}
+              className={`flex-1 h-10 rounded-xl font-bold text-sm transition-all ${
+                mode === "cash"
+                  ? "bg-cyan-500 hover:bg-cyan-600 text-white shadow-md"
+                  : "bg-slate-200 hover:bg-slate-300 text-slate-700"
+              }`}
+            >
+              EFECTIVO
+            </button>
+          </div>
+
         </div>
+
+        {duplicateDniDialog && (
+          <div className="px-6 py-4 border-b border-slate-100 bg-amber-50">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+              <p className="text-sm font-semibold text-amber-900 mb-2">
+                Afiliado existente encontrado
+              </p>
+              <p className="text-sm text-amber-700">
+                Ya existe un afiliado con DNI {duplicateDniDialog.dni}: {duplicateDniDialog.affiliate.firstName}{" "}{duplicateDniDialog.affiliate.lastName}. Está asociado al grupo #{duplicateDniDialog.affiliate.familiarGroupId}.
+              </p>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleCancelDuplicateDni}
+                  className="h-10 w-full sm:w-auto border border-amber-300 text-amber-900 bg-white hover:bg-amber-100 rounded-xl font-semibold transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDuplicateDni}
+                  className="h-10 w-10 sm:w-auto bg-amber-900 hover:bg-amber-800 text-white rounded-xl font-semibold transition-colors"
+                >
+                  Continuar igualmente
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Automatic Payment Form */}
         {mode === "automatic" && (
-          <form onSubmit={handleSubmitAuto} className="px-6 py-6 space-y-6">
+          <form ref={autoFormRef} onSubmit={handleSubmitAuto} className="px-6 py-6 space-y-6">
             {/* Card type selection */}
             {autoData.paymentMethod === "card" && (
               <div>
@@ -977,8 +1303,12 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                   name="dni"
                   value={autoData.dni}
                   onChange={handleAutoChange}
+                  onBlur={handleAutoDniBlur}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {autoError && (
+                  <p className="mt-2 text-sm text-rose-700">{autoError}</p>
+                )}
               </div>
             </div>
 
@@ -1107,7 +1437,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
         {/* Cash Payment Form */}
         {mode === "cash" && (
-          <form onSubmit={handleSubmitCash} className="px-6 py-6 space-y-6">
+          <form ref={cashFormRef} onSubmit={handleSubmitCash} className="px-6 py-6 space-y-6">
             {/* Top selects */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1202,39 +1532,55 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               </div>
             </div>
 
+            {cashError && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 mb-4">
+                {cashError}
+              </div>
+            )}
             <div className="border-t border-slate-200 pt-6">
               <div className="mb-4">
                 <button
-                  type="button"
+                  type="submit"
                   className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-colors"
                 >
                   CREAR AFILIADO
                 </button>
               </div>
-            </div>
+              {!showMemberForm && (
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    onClick={() => openMemberForm()}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-slate-300 text-slate-600 font-semibold rounded-lg hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Agregar Miembro
+                  </button>
+                </div>
+              )}
 
-            {/* Members list */}
-            <div className="space-y-6">
-              {members.map((member, index) => (
-                <div
-                  key={member.id}
-                  className="bg-slate-50 p-6 rounded-xl border border-slate-200"
-                >
+              {showMemberForm && (
+                <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-bold text-slate-900">
-                      Titular: Miembro N° {index + 1}
+                      {editingMemberId ? "Editar Miembro" : "Nuevo Miembro"}
                     </h3>
-                    {members.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeMember(member.id)}
-                        className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={closeMemberForm}
+                      className="text-slate-500 hover:text-slate-900"
+                    >
+                      Cancelar
+                    </button>
                   </div>
-
+                  {memberFormError && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 mb-4">
+                      {memberFormError}
+                    </div>
+                  )}
+                  <p className="text-sm text-slate-600 mb-4">
+                    El primer miembro siempre es el titular. Puedes editar al titular desde la lista.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -1242,13 +1588,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       </label>
                       <input
                         type="text"
-                        value={member.firstName}
+                        value={memberDraft.firstName}
                         onChange={(e) =>
-                          handleMemberChange(
-                            member.id,
-                            "firstName",
-                            e.target.value,
-                          )
+                          handleMemberDraftChange("firstName", e.target.value)
                         }
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
@@ -1259,13 +1601,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       </label>
                       <input
                         type="text"
-                        value={member.lastName}
+                        value={memberDraft.lastName}
                         onChange={(e) =>
-                          handleMemberChange(
-                            member.id,
-                            "lastName",
-                            e.target.value,
-                          )
+                          handleMemberDraftChange("lastName", e.target.value)
                         }
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
@@ -1276,19 +1614,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       </label>
                       <input
                         type="date"
-                        value={member.birthDate}
+                        value={memberDraft.birthDate}
                         onChange={(e) =>
-                          handleMemberChange(
-                            member.id,
-                            "birthDate",
-                            e.target.value,
-                          )
+                          handleMemberDraftChange("birthDate", e.target.value)
                         }
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -1296,10 +1629,11 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       </label>
                       <input
                         type="text"
-                        value={member.dni}
+                        value={memberDraft.dni}
                         onChange={(e) =>
-                          handleMemberChange(member.id, "dni", e.target.value)
+                          handleMemberDraftChange("dni", e.target.value)
                         }
+                        onBlur={handleMemberDniBlur}
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
@@ -1309,19 +1643,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       </label>
                       <input
                         type="text"
-                        value={member.address}
+                        value={memberDraft.address}
                         onChange={(e) =>
-                          handleMemberChange(
-                            member.id,
-                            "address",
-                            e.target.value,
-                          )
+                          handleMemberDraftChange("address", e.target.value)
                         }
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -1329,9 +1658,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       </label>
                       <input
                         type="email"
-                        value={member.email}
+                        value={memberDraft.email}
                         onChange={(e) =>
-                          handleMemberChange(member.id, "email", e.target.value)
+                          handleMemberDraftChange("email", e.target.value)
                         }
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
@@ -1342,9 +1671,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       </label>
                       <input
                         type="tel"
-                        value={member.phone}
+                        value={memberDraft.phone}
                         onChange={(e) =>
-                          handleMemberChange(member.id, "phone", e.target.value)
+                          handleMemberDraftChange("phone", e.target.value)
                         }
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
@@ -1355,67 +1684,98 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       </label>
                       <input
                         type="date"
-                        value={member.inscriptionDate}
+                        value={memberDraft.inscriptionDate}
                         onChange={(e) =>
-                          handleMemberChange(
-                            member.id,
-                            "inscriptionDate",
-                            e.target.value,
-                          )
+                          handleMemberDraftChange("inscriptionDate", e.target.value)
                         }
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                   </div>
-
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={member.validated}
-                      onChange={(e) =>
-                        handleMemberChange(
-                          member.id,
-                          "validated",
-                          e.target.checked,
-                        )
-                      }
-                      className="w-5 h-5 border-2 border-slate-300 rounded cursor-pointer"
-                    />
-                    <span className="text-sm font-semibold text-slate-700">
-                      Validado
-                    </span>
-                  </label>
+                  <div className="flex gap-3 pt-4 border-t border-slate-200">
+                    <button
+                      type="button"
+                      onClick={closeMemberForm}
+                      className="flex-1 h-10 border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold rounded-xl transition-colors"
+                    >
+                      CANCELAR
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveMember}
+                      className="flex-1 h-10 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors"
+                    >
+                      {editingMemberId ? "GUARDAR MIEMBRO" : "AGREGAR MIEMBRO"}
+                    </button>
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
 
-            {/* Add member button */}
-            <div className="flex gap-3 pt-4 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={addMember}
-                className="flex-1 h-10 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-xl transition-colors"
-              >
-                AGREGAR MIEMBRO
-              </button>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex gap-3 pt-4 border-t border-slate-200">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 h-10 bg-red-500 hover:bg-red-600 text-white font-bold text-sm rounded-xl transition-colors"
-              >
-                CANCELAR
-              </button>
-              <button
-                type="submit"
-                className="flex-1 h-10 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-xl transition-colors"
-              >
-                CREAR AFILIADO
-              </button>
-            </div>
+            {members.length > 0 && (
+              <div className="space-y-4">
+                {members.map((member, index) => (
+                  <div
+                    key={member.id}
+                    className="bg-slate-50 p-6 rounded-xl border border-slate-200"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">
+                          Miembro N° {index + 1}
+                        </h3>
+                        <p className="text-sm text-slate-600">
+                          {member.firstName || "Sin nombre"} {member.lastName}
+                        </p>
+                        <p className="text-sm text-slate-600">
+                          DNI: {member.dni || "-"}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openMemberForm(member)}
+                          className="h-10 px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-xl transition-colors"
+                        >
+                          {index === 0 ? "Editar titular" : "Editar"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeMember(member.id)}
+                          className="h-10 px-4 bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded-xl transition-colors"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">
+                          Fecha de inscripción
+                        </p>
+                        <p className="text-sm text-slate-700">
+                          {member.inscriptionDate || "-"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">
+                          Teléfono
+                        </p>
+                        <p className="text-sm text-slate-700">{member.phone || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">
+                          Titular
+                        </p>
+                        <p className="text-sm text-slate-700">
+                          {index === 0 ? "Sí" : "No"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </form>
         )}
       </div>

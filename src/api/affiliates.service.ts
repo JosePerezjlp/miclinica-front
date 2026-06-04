@@ -13,6 +13,9 @@ export interface AffiliateResponse {
   lastName: string;
   documentNumber: string;
   birthDate: string;
+  address?: string | null;
+  email?: string | null;
+  phone?: string | null;
   isHolder: boolean;
   isActive: boolean;
   createdAt: string;
@@ -41,6 +44,14 @@ export const affiliatesService = {
     return data;
   },
 
+  async findByDocumentNumber(documentNumber: string) {
+    const { data } = await apiClient.get<AffiliateResponse[]>(
+      `/affiliates`,
+      { params: { documentNumber } },
+    );
+    return data;
+  },
+
   async update(
     groupId: number,
     affiliateId: number,
@@ -56,6 +67,13 @@ export const affiliatesService = {
   async remove(groupId: number, affiliateId: number) {
     const { data } = await apiClient.delete<AffiliateResponse>(
       `/groups/${groupId}/affiliates/${affiliateId}`,
+    );
+    return data;
+  },
+
+  async removeById(affiliateId: number) {
+    const { data } = await apiClient.delete<AffiliateResponse>(
+      `/affiliates/${affiliateId}`,
     );
     return data;
   },

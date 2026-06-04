@@ -71,6 +71,7 @@ export const updateAffiliate = async (
     address?: string;
     email?: string;
     phone?: string;
+    isVerified?: boolean;
   },
 ): Promise<GroupDetailData> => {
   const { data } = await apiClient.patch(

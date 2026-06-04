@@ -17,11 +17,16 @@ export function mapCashMemberToAffiliateRequest(
   member: CashMember,
   isHolder = false,
 ): CreateAffiliateRequest {
+  const parsedBirthDate = new Date(member.birthDate);
+
   return {
     firstName: member.firstName.trim(),
     lastName: member.lastName.trim(),
     documentNumber: toDigits(member.dni),
-    birthDate: member.birthDate,
+    birthDate:
+      member.birthDate && !Number.isNaN(parsedBirthDate.getTime())
+        ? parsedBirthDate.toISOString()
+        : member.birthDate,
     address: member.address.trim() || undefined,
     email: member.email.trim() || undefined,
     phone: member.phone.trim() || undefined,

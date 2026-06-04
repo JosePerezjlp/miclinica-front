@@ -46,6 +46,7 @@ export interface GroupDetailData {
     email?: string | null;
     phone?: string | null;
     isHolder: boolean;
+    isVerified: boolean;
   }>;
   billingPeriods: Array<{
     id: number;
@@ -136,6 +137,7 @@ export interface UpdateAffiliatePayload {
   address?: string;
   email?: string;
   phone?: string;
+  isVerified?: boolean;
 }
 
 export interface AddPaymentMethodPayload {

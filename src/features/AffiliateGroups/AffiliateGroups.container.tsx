@@ -66,7 +66,22 @@ const AffiliateGroupsContainer: React.FC = () => {
     data: CreateAffiliateGroupModalPayload,
   ): Promise<CreateGroupSubmitResult | undefined> => {
     if (createGroupLoading) return undefined;
-    return dispatch(onCreateGroupThunk(data));
+
+    const result = await dispatch(onCreateGroupThunk(data));
+
+    if (result?.group) {
+      setPage(1);
+      dispatch(
+        getGroupsThunk({
+          page: 1,
+          pageSize: meta.pageSize,
+          dni,
+          paymentType: paymentFilter,
+        }),
+      );
+    }
+
+    return result;
   };
 
   const handleViewGroup = (groupId: number) => {

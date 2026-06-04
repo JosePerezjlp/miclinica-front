@@ -62,6 +62,16 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
     }
   };
 
+  const handleToggleVerifyMember = async (affiliateId: number, verified: boolean) => {
+    await dispatch(
+      updateAffiliateThunk({
+        groupId: groupData.id,
+        affiliateId,
+        payload: { isVerified: !verified },
+      }),
+    );
+  };
+
   const startEdit = (affiliate: any) => {
     setEditingId(affiliate.id);
     setEditData({ ...affiliate });
@@ -297,7 +307,31 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
                     </p>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  {!affiliate.isVerified ? (
+                    <button
+                      onClick={() => handleToggleVerifyMember(affiliate.id, false)}
+                      disabled={loading}
+                      className="p-2 hover:bg-green-100 text-green-600 rounded-lg transition-colors"
+                      title="Verificar"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <>
+                      <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg">
+                        Verificado
+                      </span>
+                      <button
+                        onClick={() => handleToggleVerifyMember(affiliate.id, true)}
+                        disabled={loading}
+                        className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+                        title="Quitar verificado"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={() => startEdit(affiliate)}
                     className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"

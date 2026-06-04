@@ -29,7 +29,6 @@ export interface CashMember {
   email: string;
   phone: string;
   inscriptionDate: string;
-  validated: boolean;
 }
 
 export interface AutomaticAffiliateGroupFormData {
