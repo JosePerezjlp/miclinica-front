@@ -49,6 +49,7 @@ export const TRANSACTION_KIND_COLORS: Record<string, string> = {
 export const BILLING_STATUS_LABELS: Record<string, string> = {
   PENDING: "Pendiente",
   IN_PROGRESS: "En Proceso",
+  PARTIAL: "Parcial",
   PAID: "Pagado",
   FAILED: "Fallido",
   EXEMPT: "Exento",
@@ -57,6 +58,7 @@ export const BILLING_STATUS_LABELS: Record<string, string> = {
 export const BILLING_STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-700",
   IN_PROGRESS: "bg-blue-100 text-blue-700",
+  PARTIAL: "bg-orange-100 text-orange-700",
   PAID: "bg-emerald-100 text-emerald-700",
   FAILED: "bg-red-100 text-red-700",
   EXEMPT: "bg-gray-100 text-gray-700",

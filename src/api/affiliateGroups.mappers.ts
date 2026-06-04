@@ -13,6 +13,11 @@ function toDigits(value: string): string {
   return value.replace(/\D/g, "");
 }
 
+function normalizeManualPaymentCreatedBy(value?: string): string {
+  const normalized = value?.trim();
+  return normalized || "La clinica";
+}
+
 export function mapCashMemberToAffiliateRequest(
   member: CashMember,
   isHolder = false,
@@ -129,15 +134,17 @@ export function mapAutomaticFormToPaymentMethodRequest(input: {
 
 export function buildCashSandboxPayment(input: {
   amount: number;
-  createdBy: string;
+  amountDue?: number;
+  createdBy?: string;
   reference?: string;
   notes?: string;
   paidAt?: string;
 }): CreateManualPaymentRequest {
   return {
     amount: input.amount,
+    amountDue: input.amountDue,
     method: "CASH",
-    createdBy: input.createdBy,
+    createdBy: normalizeManualPaymentCreatedBy(input.createdBy),
     reference: input.reference,
     notes: input.notes,
     paidAt: input.paidAt ?? new Date().toISOString(),
@@ -211,9 +218,10 @@ export function mapCashFormToCreateGroupRequest(
     promoterId: payload.promoterId,
     affiliates: mapCashFormToAffiliateRequests(payload),
     initialManualPayment:
-      Number(payload.planAmount ?? 0) > 0
+      Number(payload.paidAmount ?? 0) > 0
         ? buildCashSandboxPayment({
-            amount: Number(payload.planAmount),
+            amount: Number(payload.paidAmount),
+            amountDue: Number(payload.planAmount ?? 0),
             createdBy: payload.seller,
             notes: `Pago manual inicial en efectivo del plan ${payload.plan}`,
           })

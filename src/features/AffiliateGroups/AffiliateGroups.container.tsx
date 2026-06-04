@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { BadgeCheck, CreditCard, Landmark, Search, Wallet } from "lucide-react";
+import {
+  BadgeCheck,
+  CreditCard,
+  Landmark,
+  MessageCircle,
+  Search,
+  Wallet,
+} from "lucide-react";
 import type {
   AffiliateStatus,
   CreateGroupSubmitResult,
@@ -29,6 +36,18 @@ const PAYMENT_METHOD_ICON = {
   cash: Wallet,
 } as const;
 
+const GROUP_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "ACTIVO",
+  EXPIRED: "EXPIRADO",
+  NO_COVERAGE: "SIN COBERTURA",
+  GRACE_PERIOD: "GRACIA",
+};
+
+const buildWhatsAppUrl = (phone?: string | null) => {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  return digits ? `https://wa.me/${digits}` : null;
+};
+
 const formatAffiliateName = (affiliate: {
   firstName?: string | null;
   lastName?: string | null;
@@ -39,6 +58,27 @@ const formatAffiliateName = (affiliate: {
     .trim();
 
   return fullName || "Sin nombre";
+};
+
+const PhoneLink: React.FC<{ phone?: string | null }> = ({ phone }) => {
+  const whatsappUrl = buildWhatsAppUrl(phone);
+
+  if (!phone || !whatsappUrl) {
+    return <span>{phone ?? "N/A"}</span>;
+  }
+
+  return (
+    <a
+      href={whatsappUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-2 text-emerald-700 hover:text-emerald-800 hover:underline"
+      title={`Enviar WhatsApp a ${phone}`}
+    >
+      <span>{phone}</span>
+      <MessageCircle className="w-4 h-4" />
+    </a>
+  );
 };
 
 const AffiliateGroupsContainer: React.FC = () => {
@@ -180,19 +220,18 @@ const AffiliateGroupsContainer: React.FC = () => {
                 <th className="px-4 py-3 font-semibold">Plan</th>
                 <th className="px-4 py-3 font-semibold">Medio de Pago</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
-                <th className="px-4 py-3 font-semibold text-right">
-                  Acciones
-                </th>
+                <th className="px-4 py-3 font-semibold text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {Array.isArray(data) && data.filter(Boolean).length > 0 ? (
                 data.filter(Boolean).map((group: any) => {
-                  const paymentTypeRaw = group.paymentMethods?.[0]?.type ?? "cash";
+                  const paymentTypeRaw =
+                    group.paymentMethods?.[0]?.type ?? "cash";
                   const paymentType =
                     paymentTypeRaw.toLowerCase() as keyof typeof PAYMENT_METHOD_ICON;
-                  const PaymentIcon = PAYMENT_METHOD_ICON[paymentType] ?? Wallet;
-                  const holder = group.affiliates?.find((a: any) => a.isHolder);
+                  const PaymentIcon =
+                    PAYMENT_METHOD_ICON[paymentType] ?? Wallet;
                   const affiliates = Array.isArray(group.affiliates)
                     ? group.affiliates.filter(Boolean)
                     : [];
@@ -205,38 +244,43 @@ const AffiliateGroupsContainer: React.FC = () => {
                         </td>
                         <td className="px-4 py-4 font-semibold text-slate-900">
                           <div>{group.name}</div>
-                          {group.promoter?.name && (
-                            <div className="mt-1 text-xs font-medium text-slate-500">
-                              Promotor: {group.promoter.name}
-                            </div>
-                          )}
                         </td>
                         <td className="px-4 py-4 text-slate-700">
-                          {group.holderFullName}
+                          {group.promoter?.name ? (
+                            <div>
+                              <div>{group.promoter.name}</div>
+                              <div className="mt-1 text-xs font-medium text-slate-500">
+                                Promotor
+                              </div>
+                            </div>
+                          ) : (
+                            "-"
+                          )}
                         </td>
                         <td className="px-4 py-4 text-slate-600">
                           {new Date(group.createdAt).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-4 text-slate-600 font-mono text-xs">
-                          {holder?.documentNumber ?? "N/A"}
+                          -
                         </td>
-                        <td className="px-4 py-4 text-slate-600">
-                          {holder?.phone ?? "N/A"}
-                        </td>
+                        <td className="px-4 py-4 text-slate-600">-</td>
                         <td className="px-4 py-4 text-slate-600">
                           {group.plan?.name ?? "N/A"}
                         </td>
                         <td className="px-4 py-4 text-slate-700">
                           <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold">
                             <PaymentIcon className="w-3 h-3" />
-                            {PAYMENT_METHOD_LABEL[paymentType] ?? paymentTypeRaw}
+                            {PAYMENT_METHOD_LABEL[paymentType] ??
+                              paymentTypeRaw}
                           </span>
                         </td>
                         <td className="px-4 py-4">
                           <span
                             className={`inline-block px-2.5 py-1 rounded-lg text-xs font-semibold ${STATUS_CLASS[group.planStatus?.toLowerCase() as AffiliateStatus] ?? "bg-slate-100 text-slate-700"}`}
                           >
-                            {group.planStatus ?? "N/A"}
+                            {GROUP_STATUS_LABEL[group.planStatus ?? ""] ??
+                              group.planStatus ??
+                              "N/A"}
                           </span>
                         </td>
                         <td className="px-4 py-4 text-right">
@@ -260,34 +304,49 @@ const AffiliateGroupsContainer: React.FC = () => {
                               {index === 0 ? "" : ""}
                             </td>
                             <td className="px-4 py-3">
-                              <div className="pl-4 border-l-2 border-slate-200">
-                                <div className="font-medium text-slate-700">
-                                  {formatAffiliateName(affiliate)}
+                              {affiliate.isHolder ? (
+                                <span>-</span>
+                              ) : (
+                                <div className="pl-4 border-l-2 border-slate-200">
+                                  <div className="font-medium text-slate-700">
+                                    {formatAffiliateName(affiliate)}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    Integrante
+                                  </div>
                                 </div>
-                                <div className="mt-1 text-xs text-slate-500">
-                                  {affiliate.isHolder ? "Titular" : "Integrante"}
-                                </div>
-                              </div>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-slate-600">
-                              {formatAffiliateName(affiliate)}
+                              {affiliate.isHolder ? (
+                                <div>
+                                  <div className="font-medium text-slate-700">
+                                    {formatAffiliateName(affiliate)}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    Titular
+                                  </div>
+                                </div>
+                              ) : (
+                                "-"
+                              )}
                             </td>
                             <td className="px-4 py-3 text-slate-600">
                               {affiliate.birthDate
-                                ? new Date(affiliate.birthDate).toLocaleDateString()
+                                ? new Date(
+                                    affiliate.birthDate,
+                                  ).toLocaleDateString()
                                 : "N/A"}
                             </td>
                             <td className="px-4 py-3 text-slate-600 font-mono text-xs">
                               {affiliate.documentNumber ?? "N/A"}
                             </td>
                             <td className="px-4 py-3 text-slate-600">
-                              {affiliate.phone ?? "N/A"}
+                              <PhoneLink phone={affiliate.phone} />
                             </td>
-                            <td className="px-4 py-3 text-slate-600">
-                              {group.plan?.name ?? "N/A"}
-                            </td>
+                            <td className="px-4 py-3 text-slate-600">-</td>
                             <td className="px-4 py-3 text-slate-500 text-xs">
-                              {affiliate.email ?? affiliate.address ?? "-"}
+                              -
                             </td>
                             <td className="px-4 py-3">
                               <span className="inline-block px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-200 text-slate-700">

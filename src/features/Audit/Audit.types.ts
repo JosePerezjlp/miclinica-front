@@ -6,7 +6,13 @@ export type TransactionKind =
   | "CREDIT_ADVANCE"
   | "CREDIT_DISCOUNT";
 
-export type BillingStatus = "PENDING" | "IN_PROGRESS" | "PAID" | "FAILED" | "EXEMPT";
+export type BillingStatus =
+  | "PENDING"
+  | "IN_PROGRESS"
+  | "PARTIAL"
+  | "PAID"
+  | "FAILED"
+  | "EXEMPT";
 export type ChargeAttemptResult =
   | "SUCCESS"
   | "FAILED_INSUFFICIENT_FUNDS"

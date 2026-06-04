@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { X, Trash2 } from "lucide-react";
 import { mobbexService } from "../../api/mobbex.service";
+import { paymentsService } from "../../api/payments.service";
 import { plansService } from "../../api/plans.service";
 import { promotersService } from "../../api/promoters.service";
 import {
@@ -84,6 +85,17 @@ function formatPlanLabel(plan: PlanResponse): string {
   }).format(Number.isNaN(amount) ? 0 : amount)}`;
 }
 
+function parseCurrencyInput(value: string): number | undefined {
+  const normalized = value.replace(/,/g, ".").replace(/[^\d.]/g, "");
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   isOpen,
   onClose,
@@ -132,6 +144,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const [mobbexSubscriptionsError, setMobbexSubscriptionsError] = useState("");
   const [generatedMobbexLink, setGeneratedMobbexLink] = useState("");
   const [copyFeedback, setCopyFeedback] = useState("");
+  const [detectedCardBrand, setDetectedCardBrand] = useState("");
 
   // Cash payment form
   const [cashData, setCashData] = useState<
@@ -139,10 +152,11 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   >({
     promoterId: undefined,
     promoterName: "",
-    seller: sellerOptions[0],
+    seller: "",
     plan: "",
     planId: undefined,
     planAmount: undefined,
+    paidAmount: undefined,
     city: cityOptions[0],
   });
 
@@ -206,9 +220,18 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     });
   };
 
-  const handleCashChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleCashChange = (
+    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>,
+  ) => {
     const { name, value } = e.target;
     setCashData((prev) => {
+      if (name === "paidAmount") {
+        return {
+          ...prev,
+          paidAmount: parseCurrencyInput(value),
+        };
+      }
+
       if (name === "promoterId") {
         const selectedPromoter = localPromoters.find(
           (promoter) => promoter.id === Number(value),
@@ -232,6 +255,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
           planAmount: selectedPlan
             ? Number(selectedPlan.monthlyFee)
             : prev.planAmount,
+          paidAmount: selectedPlan
+            ? Number(selectedPlan.monthlyFee)
+            : prev.paidAmount,
         };
       }
 
@@ -424,6 +450,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       planId: firstPlan.id,
       plan: firstPlan.name,
       planAmount: Number(firstPlan.monthlyFee),
+      paidAmount: Number(firstPlan.monthlyFee),
     }));
   }, [mode, cashData.planId, localPlans]);
 
@@ -499,6 +526,42 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       cancelled = true;
     };
   }, [isOpen, mode, autoData.gateway]);
+
+  useEffect(() => {
+    if (mode !== "automatic" || autoData.paymentMethod !== "card") {
+      setDetectedCardBrand("");
+      return;
+    }
+
+    const digits = autoData.cardNumber.replace(/\D/g, "");
+
+    if (digits.length < 4) {
+      setDetectedCardBrand("");
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await paymentsService.detectCardBrand(
+          autoData.cardNumber,
+        );
+
+        if (!cancelled) {
+          setDetectedCardBrand(response.brand ?? "");
+        }
+      } catch {
+        if (!cancelled) {
+          setDetectedCardBrand("");
+        }
+      }
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [mode, autoData.paymentMethod, autoData.cardNumber]);
 
   const handleMemberChange = (
     memberId: number,
@@ -585,13 +648,15 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     setMobbexSubscriptionsError("");
     setGeneratedMobbexLink("");
     setCopyFeedback("");
+    setDetectedCardBrand("");
     setCashData({
       promoterId: localPromoters[0]?.id,
       promoterName: localPromoters[0]?.name ?? "",
-      seller: sellerOptions[0],
+      seller: "",
       plan: localPlans[0]?.name ?? "",
       planId: localPlans[0]?.id,
       planAmount: localPlans[0] ? Number(localPlans[0].monthlyFee) : undefined,
+      paidAmount: localPlans[0] ? Number(localPlans[0].monthlyFee) : undefined,
       city: cityOptions[0],
     });
     setMembers([
@@ -612,6 +677,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const planAmount = Number(cashData.planAmount ?? 0);
+  const paidAmount = Number(cashData.paidAmount ?? 0);
+  const remainingAmount = Math.max(0, planAmount - paidAmount);
+  const isPartialCashPayment =
+    planAmount > 0 && paidAmount > 0 && paidAmount < planAmount;
+  const isCompleteCashPayment = planAmount > 0 && paidAmount === planAmount;
+  const exceedsPlanAmount = planAmount > 0 && paidAmount > planAmount;
 
   const handleCopyMobbexLink = async () => {
     if (!generatedMobbexLink) {
@@ -876,6 +949,11 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       placeholder="1234 5678 9012 3456"
                       className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    {detectedCardBrand && (
+                      <p className="mt-2 text-xs font-semibold text-emerald-700">
+                        Marca detectada: {detectedCardBrand}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -1141,14 +1219,15 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Vendedor
+                  Vendedor (opcional)
                 </label>
                 <select
                   name="seller"
-                  value={cashData.seller}
+                  value={cashData.seller ?? ""}
                   onChange={handleCashChange}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
+                  <option value="">Sin vendedor (La clinica)</option>
                   {sellerOptions.map((seller) => (
                     <option key={seller} value={seller}>
                       {seller}
@@ -1201,6 +1280,66 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                 </select>
               </div>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Cuota del plan
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={planAmount > 0 ? planAmount.toFixed(2) : ""}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-100 text-slate-600"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Abonado
+                </label>
+                <input
+                  type="text"
+                  name="paidAmount"
+                  value={cashData.paidAmount ?? ""}
+                  onChange={handleCashChange}
+                  placeholder="0.00"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Saldo restante
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={planAmount > 0 ? remainingAmount.toFixed(2) : ""}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-100 text-slate-600"
+                />
+              </div>
+            </div>
+
+            {planAmount > 0 && paidAmount > 0 && (
+              <div
+                className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
+                  exceedsPlanAmount
+                    ? "border-red-200 bg-red-50 text-red-900"
+                    : isPartialCashPayment
+                      ? "border-amber-200 bg-amber-50 text-amber-900"
+                      : isCompleteCashPayment
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                        : "border-slate-200 bg-slate-50 text-slate-700"
+                }`}
+              >
+                {exceedsPlanAmount
+                  ? "El abonado no puede exceder la cuota del plan."
+                  : isPartialCashPayment
+                    ? `Pago parcial: abonó $${paidAmount.toFixed(2)} y quedan $${remainingAmount.toFixed(2)} pendientes.`
+                    : isCompleteCashPayment
+                      ? `Pago completo: la cuota de $${planAmount.toFixed(2)} quedó saldada.`
+                      : "Ingresá el monto abonado para calcular el estado del pago."}
+              </div>
+            )}
 
             <div className="border-t border-slate-200 pt-6">
               <div className="mb-4">
@@ -1411,6 +1550,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               </button>
               <button
                 type="submit"
+                disabled={
+                  planAmount <= 0 || paidAmount <= 0 || exceedsPlanAmount
+                }
                 className="flex-1 h-10 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-xl transition-colors"
               >
                 CREAR AFILIADO

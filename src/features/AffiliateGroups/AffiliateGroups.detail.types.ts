@@ -74,6 +74,7 @@ export interface GroupDetailData {
   manualPayments: Array<{
     id: number;
     familiarGroupId: number;
+    billingPeriodId?: number | null;
     amount: number;
     method: string;
     paidAt: string;

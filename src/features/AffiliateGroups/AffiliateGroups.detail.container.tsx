@@ -82,6 +82,9 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
   const activeMethods =
     groupData.paymentMethods?.filter((m) => m.isActive) || [];
   const nextAutomaticMethod = activeMethods[0] ?? null;
+  const billingPeriodById = new Map(
+    (groupData.billingPeriods || []).map((period) => [period.id, period]),
+  );
   const recentPayments: UnifiedRecentPayment[] = [
     ...(groupData.payments || []).map((payment) => ({
       id: payment.id,
@@ -93,16 +96,25 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
       gatewayLabel: payment.gateway,
       eventDate: payment.createdAt,
     })),
-    ...(groupData.manualPayments || []).map((payment) => ({
-      id: payment.id,
-      amount: Number(payment.amount || 0),
-      month: payment.month,
-      year: payment.year,
-      status: "PAID",
-      source: "MANUAL_PAYMENT" as const,
-      gatewayLabel: payment.method,
-      eventDate: payment.paidAt || payment.createdAt,
-    })),
+    ...(groupData.manualPayments || []).map((payment) => {
+      const relatedPeriod = payment.billingPeriodId
+        ? billingPeriodById.get(payment.billingPeriodId)
+        : (groupData.billingPeriods || []).find(
+            (period) =>
+              period.month === payment.month && period.year === payment.year,
+          );
+
+      return {
+        id: payment.id,
+        amount: Number(payment.amount || 0),
+        month: payment.month,
+        year: payment.year,
+        status: relatedPeriod?.status ?? "PAID",
+        source: "MANUAL_PAYMENT" as const,
+        gatewayLabel: payment.method,
+        eventDate: payment.paidAt || payment.createdAt,
+      };
+    }),
   ]
     .sort((left, right) => {
       if (right.year !== left.year) return right.year - left.year;
@@ -487,7 +499,9 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
                         className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold ${
                           payment.status === "PAID"
                             ? "bg-emerald-100 text-emerald-700"
-                            : "bg-red-100 text-red-700"
+                            : payment.status === "PARTIAL"
+                              ? "bg-orange-100 text-orange-700"
+                              : "bg-red-100 text-red-700"
                         }`}
                       >
                         {payment.status}
