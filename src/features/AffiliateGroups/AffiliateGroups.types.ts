@@ -61,10 +61,11 @@ export interface CashAffiliateGroupFormData {
   mode: "cash";
   promoterId?: number;
   promoterName?: string;
-  seller: string;
+  seller?: string;
   plan: string;
   planId?: number;
   planAmount?: number;
+  paidAmount?: number;
   city: string;
   members: CashMember[];
 }
@@ -262,9 +263,10 @@ export interface PaymentAttemptResponse {
 
 export interface CreateManualPaymentRequest {
   amount: number;
+  amountDue?: number;
   method: ManualPaymentMethod;
   paidAt: string;
-  createdBy: string;
+  createdBy?: string;
   reference?: string;
   notes?: string;
 }

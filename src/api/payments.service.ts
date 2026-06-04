@@ -26,6 +26,10 @@ export interface RegisterSandboxCardInput {
   deviceFingerprintId?: string;
 }
 
+export interface CardBrandDetectionResponse {
+  brand: string | null;
+}
+
 export const paymentsService = {
   async createGroupPaymentMethod(
     groupId: number,
@@ -55,6 +59,16 @@ export const paymentsService = {
   async listPaymentAttempts(groupId: number) {
     const { data } = await apiClient.get<PaymentAttemptResponse[]>(
       `/groups/${groupId}/payment-attempts`,
+    );
+    return data;
+  },
+
+  async detectCardBrand(cardNumber: string) {
+    const { data } = await apiClient.get<CardBrandDetectionResponse>(
+      "/payments/card-brand",
+      {
+        params: { cardNumber },
+      },
     );
     return data;
   },

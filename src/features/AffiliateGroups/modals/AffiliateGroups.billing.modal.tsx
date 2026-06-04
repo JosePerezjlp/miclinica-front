@@ -1,6 +1,6 @@
-import React from 'react';
-import { X } from 'lucide-react';
-import type { GroupDetailData } from '../AffiliateGroups.detail.types';
+import React from "react";
+import { X } from "lucide-react";
+import type { GroupDetailData } from "../AffiliateGroups.detail.types";
 
 interface BillingModalProps {
   groupData: GroupDetailData;
@@ -9,7 +9,7 @@ interface BillingModalProps {
 
 type UnifiedPaymentEntry = {
   id: number;
-  source: 'PAYMENT' | 'MANUAL_PAYMENT';
+  source: "PAYMENT" | "MANUAL_PAYMENT";
   amount: number;
   month: number;
   year: number;
@@ -23,10 +23,13 @@ type UnifiedPaymentEntry = {
 };
 
 const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
+  const billingPeriodById = new Map(
+    (groupData.billingPeriods || []).map((period) => [period.id, period]),
+  );
   const unifiedPayments: UnifiedPaymentEntry[] = [
     ...(groupData.payments || []).map((payment) => ({
       id: payment.id,
-      source: 'PAYMENT' as const,
+      source: "PAYMENT" as const,
       amount: Number(payment.amount || 0),
       month: payment.month,
       year: payment.year,
@@ -38,36 +41,56 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
       reference: null,
       notes: null,
     })),
-    ...(groupData.manualPayments || []).map((payment) => ({
-      id: payment.id,
-      source: 'MANUAL_PAYMENT' as const,
-      amount: Number(payment.amount || 0),
-      month: payment.month,
-      year: payment.year,
-      status: 'PAID',
-      channel: payment.method,
-      eventDate: payment.paidAt || payment.createdAt,
-      createdAt: payment.createdAt,
-      gatewayTransactionId: null,
-      reference: payment.reference,
-      notes: payment.notes,
-    })),
+    ...(groupData.manualPayments || []).map((payment) => {
+      const relatedPeriod = payment.billingPeriodId
+        ? billingPeriodById.get(payment.billingPeriodId)
+        : (groupData.billingPeriods || []).find(
+            (period) =>
+              period.month === payment.month && period.year === payment.year,
+          );
+
+      return {
+        id: payment.id,
+        source: "MANUAL_PAYMENT" as const,
+        amount: Number(payment.amount || 0),
+        month: payment.month,
+        year: payment.year,
+        status: relatedPeriod?.status ?? "PAID",
+        channel: payment.method,
+        eventDate: payment.paidAt || payment.createdAt,
+        createdAt: payment.createdAt,
+        gatewayTransactionId: null,
+        reference: payment.reference,
+        notes: payment.notes,
+      };
+    }),
   ].sort((left, right) => {
     if (right.year !== left.year) return right.year - left.year;
     if (right.month !== left.month) return right.month - left.month;
-    return new Date(right.eventDate).getTime() - new Date(left.eventDate).getTime();
+    return (
+      new Date(right.eventDate).getTime() - new Date(left.eventDate).getTime()
+    );
   });
 
-  const totalPaid = unifiedPayments.reduce((sum, payment) => sum + payment.amount, 0);
-  const paidCount = unifiedPayments.filter((payment) => payment.status === 'PAID').length;
-  const failedCount = unifiedPayments.filter((payment) => payment.status === 'FAILED').length;
+  const totalPaid = unifiedPayments.reduce(
+    (sum, payment) => sum + payment.amount,
+    0,
+  );
+  const paidCount = unifiedPayments.filter(
+    (payment) => payment.status === "PAID",
+  ).length;
+  const failedCount = unifiedPayments.filter(
+    (payment) => payment.status === "FAILED",
+  ).length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-200 sticky top-0 bg-white">
-          <h2 className="text-xl font-bold text-slate-900">Historial de Facturación y Pagos</h2>
+          <h2 className="text-xl font-bold text-slate-900">
+            Historial de Facturación y Pagos
+          </h2>
           <button
             onClick={onClose}
             className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
@@ -80,19 +103,25 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
           {/* Summary Stats */}
           <div className="grid grid-cols-3 gap-4">
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-xs uppercase text-blue-600 font-semibold">Total Pagos</p>
+              <p className="text-xs uppercase text-blue-600 font-semibold">
+                Total Pagos
+              </p>
               <p className="text-2xl font-bold text-blue-900 mt-2">
                 ${totalPaid.toFixed(2)}
               </p>
             </div>
             <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-              <p className="text-xs uppercase text-emerald-600 font-semibold">Pagados</p>
+              <p className="text-xs uppercase text-emerald-600 font-semibold">
+                Pagados
+              </p>
               <p className="text-2xl font-bold text-emerald-900 mt-2">
                 {paidCount}
               </p>
             </div>
             <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-              <p className="text-xs uppercase text-red-600 font-semibold">Fallidos</p>
+              <p className="text-xs uppercase text-red-600 font-semibold">
+                Fallidos
+              </p>
               <p className="text-2xl font-bold text-red-900 mt-2">
                 {failedCount}
               </p>
@@ -101,7 +130,9 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
 
           {/* Unified Payments History */}
           <div>
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Historial Unificado de Pagos</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">
+              Historial Unificado de Pagos
+            </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -117,24 +148,34 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
                 <tbody className="divide-y divide-slate-100">
                   {unifiedPayments.length > 0 ? (
                     unifiedPayments.map((payment) => (
-                      <tr key={`${payment.source}-${payment.id}`} className="hover:bg-slate-50 transition-colors">
+                      <tr
+                        key={`${payment.source}-${payment.id}`}
+                        className="hover:bg-slate-50 transition-colors"
+                      >
                         <td className="px-4 py-3 font-semibold text-slate-900">
-                          {String(payment.month).padStart(2, '0')}/{payment.year}
+                          {String(payment.month).padStart(2, "0")}/
+                          {payment.year}
                         </td>
                         <td className="px-4 py-3 text-slate-600 text-xs font-semibold">
-                          {payment.source === 'MANUAL_PAYMENT' ? 'Manual' : 'Automático'}
+                          {payment.source === "MANUAL_PAYMENT"
+                            ? "Manual"
+                            : "Automático"}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           ${payment.amount.toFixed(2)}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                            payment.status === 'PAID'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : payment.status === 'FAILED'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}>
+                          <span
+                            className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                              payment.status === "PAID"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : payment.status === "PARTIAL"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : payment.status === "FAILED"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
                             {payment.status}
                           </span>
                         </td>
@@ -142,13 +183,18 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
                           {payment.channel}
                         </td>
                         <td className="px-4 py-3 text-slate-600 text-xs">
-                          {new Date(payment.eventDate).toLocaleDateString('es-AR')}
+                          {new Date(payment.eventDate).toLocaleDateString(
+                            "es-AR",
+                          )}
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                      <td
+                        colSpan={6}
+                        className="px-4 py-8 text-center text-slate-500"
+                      >
                         No hay pagos registrados
                       </td>
                     </tr>
@@ -161,28 +207,45 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
           {/* All Payments Detail */}
           {unifiedPayments.length > 0 && (
             <div>
-              <h3 className="text-lg font-bold text-slate-900 mb-4">Detalle de Pagos</h3>
+              <h3 className="text-lg font-bold text-slate-900 mb-4">
+                Detalle de Pagos
+              </h3>
               <div className="space-y-3">
                 {unifiedPayments.map((payment) => (
-                  <div key={`${payment.source}-${payment.id}`} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                  <div
+                    key={`${payment.source}-${payment.id}`}
+                    className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <p className="font-semibold text-slate-900">
-                          Pago #{payment.id} - {String(payment.month).padStart(2, '0')}/{payment.year}
+                          Pago #{payment.id} -{" "}
+                          {String(payment.month).padStart(2, "0")}/
+                          {payment.year}
                         </p>
                         <p className="text-xs text-slate-500">
-                          {payment.source === 'MANUAL_PAYMENT' ? 'Pago manual' : 'Pago automático'} • {new Date(payment.eventDate).toLocaleDateString('es-AR')}
+                          {payment.source === "MANUAL_PAYMENT"
+                            ? "Pago manual"
+                            : "Pago automático"}{" "}
+                          •{" "}
+                          {new Date(payment.eventDate).toLocaleDateString(
+                            "es-AR",
+                          )}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-slate-900">
                           ${payment.amount.toFixed(2)}
                         </p>
-                        <span className={`inline-block mt-1 px-2 py-1 rounded text-xs font-semibold ${
-                          payment.status === 'PAID'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}>
+                        <span
+                          className={`inline-block mt-1 px-2 py-1 rounded text-xs font-semibold ${
+                            payment.status === "PAID"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : payment.status === "PARTIAL"
+                                ? "bg-orange-100 text-orange-700"
+                                : "bg-red-100 text-red-700"
+                          }`}
+                        >
                           {payment.status}
                         </span>
                       </div>
@@ -194,15 +257,23 @@ const BillingModal: React.FC<BillingModalProps> = ({ groupData, onClose }) => {
                       </div>
                       <div>
                         <p className="text-slate-500">Referencia</p>
-                        <p className="font-mono">{payment.reference || payment.gatewayTransactionId || '—'}</p>
+                        <p className="font-mono">
+                          {payment.reference ||
+                            payment.gatewayTransactionId ||
+                            "—"}
+                        </p>
                       </div>
                       <div>
                         <p className="text-slate-500">Origen</p>
-                        <p>{payment.source === 'MANUAL_PAYMENT' ? 'Manual' : 'Automático'}</p>
+                        <p>
+                          {payment.source === "MANUAL_PAYMENT"
+                            ? "Manual"
+                            : "Automático"}
+                        </p>
                       </div>
                       <div>
                         <p className="text-slate-500">Notas</p>
-                        <p>{payment.notes || '—'}</p>
+                        <p>{payment.notes || "—"}</p>
                       </div>
                     </div>
                   </div>
