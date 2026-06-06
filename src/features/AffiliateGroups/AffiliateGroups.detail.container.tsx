@@ -31,6 +31,13 @@ type UnifiedRecentPayment = {
 
 const buildBillingPeriodKey = (month: number, year: number) => `${year}-${month}`;
 
+const PLAN_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: "Activo",
+  EXPIRED: "Vencido",
+  NO_COVERAGE: "Sin cobertura",
+  GRACE_PERIOD: "Período de gracia",
+};
+
 const AffiliateGroupsDetailContainer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -81,6 +88,7 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
 
   const holder = groupData.affiliates?.find((a) => a.isHolder);
   const planStatus = groupData.planStatus || "N/A";
+  const planStatusLabel = PLAN_STATUS_LABELS[planStatus] || planStatus;
   const activeMethods =
     groupData.paymentMethods?.filter((m) => m.isActive) || [];
   const nextAutomaticMethod = activeMethods[0] ?? null;
@@ -147,6 +155,9 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
   );
   const billingBalance =
     Number(groupData.currentAccount?.balanceCapital ?? computedPendingBalance) || 0;
+  const formattedPlanPrice = groupData.plan
+    ? `$${Number(groupData.plan.monthlyFee).toFixed(2)}`
+    : "Sin precio";
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 px-6 py-6 space-y-6">
@@ -177,17 +188,37 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
+        <button
+          type="button"
+          onClick={() => setActiveModal("plans")}
+          className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-slate-500 text-sm">Plan Actual</p>
+              <p className="text-slate-500 text-sm">Plan</p>
               <p className="text-2xl font-bold text-slate-900 mt-2">
                 {groupData.plan?.name || "N/A"}
               </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    planStatus === "ACTIVE"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : planStatus === "GRACE_PERIOD"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-red-100 text-red-700"
+                  }`}
+                >
+                  {planStatusLabel}
+                </span>
+                <span className="text-sm font-semibold text-slate-700">
+                  {formattedPlanPrice}/mes
+                </span>
+              </div>
             </div>
             <FileText className="w-10 h-10 text-blue-500 opacity-20" />
           </div>
-        </div>
+        </button>
 
         <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-emerald-500">
           <div className="flex items-center justify-between">
@@ -443,50 +474,6 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
 
         {/* Right Column - Secondary Info */}
         <div className="space-y-6">
-          {/* Plan */}
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-900">Plan</h2>
-              <button
-                onClick={() => setActiveModal("plans")}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <Edit2 className="w-4 h-4 text-slate-600" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs uppercase text-slate-500 font-semibold">
-                  Nombre
-                </p>
-                <p className="text-lg font-semibold text-slate-900 mt-1">
-                  {groupData.plan?.name || "N/A"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase text-slate-500 font-semibold">
-                  Cuota Mensual
-                </p>
-                <p className="text-lg font-semibold text-slate-900 mt-1"></p>
-              </div>
-              <div>
-                <p className="text-xs uppercase text-slate-500 font-semibold">
-                  Estado del Plan
-                </p>
-                <span
-                  className={`inline-block mt-2 px-3 py-1 rounded-lg text-xs font-semibold ${
-                    planStatus === "ACTIVE"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-red-100 text-red-700"
-                  }`}
-                >
-                  {planStatus}
-                </span>
-              </div>
-            </div>
-          </div>
-
           {/* Pagos Recientes */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-6">
