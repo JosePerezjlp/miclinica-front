@@ -1,7 +1,6 @@
 export type AffiliateStatus = "active" | "suspended" | "no-coverage";
 
 export type PaymentMode = "automatic" | "cash";
-export type CardType = "credit" | "debit" | "prepaid";
 export type PaymentGatewayProvider = "SIRO" | "PAYWAY" | "MOBBEX";
 export type PaymentMethodType = "CARD" | "CBU";
 export type ManualPaymentMethod = "CARD" | "CASH" | "TRANSFER";
@@ -33,7 +32,6 @@ export interface CashMember {
 
 export interface AutomaticAffiliateGroupFormData {
   mode: "automatic";
-  cardType: CardType;
   gateway: PaymentGatewayProvider;
   plan: string;
   planId?: number;
@@ -48,12 +46,6 @@ export interface AutomaticAffiliateGroupFormData {
   firstName: string;
   lastName: string;
   dni: string;
-  province: string;
-  city: string;
-  email: string;
-  postalCode: string;
-  address: string;
-  phone: string;
   deviceFingerprintId: string;
 }
 
@@ -66,6 +58,8 @@ export interface CashAffiliateGroupFormData {
   planId?: number;
   planAmount?: number;
   paidAmount?: number;
+  discountAmount?: number;
+  discountReason?: string;
   city: string;
   members: CashMember[];
 }
@@ -263,7 +257,10 @@ export interface PaymentAttemptResponse {
 
 export interface CreateManualPaymentRequest {
   amount: number;
+  billingPeriodId?: number;
   amountDue?: number;
+  discountAmount?: number;
+  discountReason?: string;
   method: ManualPaymentMethod;
   paidAt: string;
   createdBy?: string;
@@ -282,4 +279,15 @@ export interface ManualPaymentResponse {
   notes?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SettleDebtRequest {
+  amount: number;
+  discountAmount?: number;
+  discountReason?: string;
+  method: ManualPaymentMethod;
+  paidAt: string;
+  createdBy?: string;
+  reference?: string;
+  notes?: string;
 }

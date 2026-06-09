@@ -127,6 +127,7 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
               const hasDetails =
                 transaction.billingPeriod ||
                 transaction.manualPayment ||
+                transaction.discount ||
                 transaction.chargeAttempts;
 
               return (
@@ -283,6 +284,54 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
                                   </span>
                                   <div className="font-mono text-slate-900">
                                     {transaction.manualPayment.reference}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {transaction.discount && (
+                            <div className="bg-white rounded-lg p-3 border border-slate-200">
+                              <div className="text-xs font-bold text-slate-700 mb-2">
+                                BONIFICACIÓN
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                                <div>
+                                  <span className="text-slate-600">Tipo:</span>
+                                  <div className="font-semibold text-slate-900">
+                                    {transaction.discount.type}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-slate-600">Monto:</span>
+                                  <div className="font-semibold text-slate-900">
+                                    {formatCurrency(
+                                      transaction.discount.amount,
+                                    )}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-slate-600">
+                                    Aplicó:
+                                  </span>
+                                  <div className="font-semibold text-slate-900">
+                                    {transaction.discount.appliedBy}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-slate-600">Fecha:</span>
+                                  <div className="font-semibold text-slate-900">
+                                    {formatDate(transaction.discount.createdAt)}
+                                  </div>
+                                </div>
+                              </div>
+                              {transaction.discount.reason && (
+                                <div className="mt-2 text-sm">
+                                  <span className="text-slate-600">
+                                    Motivo:
+                                  </span>
+                                  <div className="text-slate-900">
+                                    {transaction.discount.reason}
                                   </div>
                                 </div>
                               )}

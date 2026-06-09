@@ -18,6 +18,20 @@ function normalizeManualPaymentCreatedBy(value?: string): string {
   return normalized || "La clinica";
 }
 
+function buildAutomaticFallbackEmail(input: {
+  firstName: string;
+  lastName: string;
+  documentNumber?: string;
+}): string {
+  const normalizedName = `${input.firstName.trim()}${input.lastName.trim()}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  const normalizedDocument = toDigits(input.documentNumber ?? "");
+  const identifier = normalizedDocument || normalizedName || "titular";
+
+  return `pagos+${identifier}@miclinica.local`;
+}
+
 export function mapCashMemberToAffiliateRequest(
   member: CashMember,
   isHolder = false,
@@ -58,14 +72,7 @@ export function mapAutomaticFormToPaymentMethodRequest(input: {
   cardCvv?: string;
   firstName: string;
   lastName: string;
-  cardType?: string;
   documentNumber?: string;
-  email?: string;
-  address?: string;
-  city?: string;
-  province?: string;
-  postalCode?: string;
-  phone?: string;
   deviceFingerprintId?: string;
 }): CreateGroupPaymentMethodRequest {
   if (input.gateway === "MOBBEX") {
@@ -74,16 +81,9 @@ export function mapAutomaticFormToPaymentMethodRequest(input: {
       type: "CARD",
       priority: input.priority ?? 1,
       holderName: `${input.firstName.trim()} ${input.lastName.trim()}`.trim(),
-      brand: input.cardType,
       documentNumber: input.documentNumber
         ? toDigits(input.documentNumber)
         : undefined,
-      email: input.email?.trim() || undefined,
-      address: input.address?.trim() || undefined,
-      city: input.city?.trim() || undefined,
-      province: input.province?.trim() || undefined,
-      postalCode: input.postalCode?.trim() || undefined,
-      phone: input.phone ? toDigits(input.phone) : undefined,
     };
   }
 
@@ -98,12 +98,6 @@ export function mapAutomaticFormToPaymentMethodRequest(input: {
       documentNumber: input.documentNumber
         ? toDigits(input.documentNumber)
         : undefined,
-      email: input.email?.trim() || undefined,
-      address: input.address?.trim() || undefined,
-      city: input.city?.trim() || undefined,
-      province: input.province?.trim() || undefined,
-      postalCode: input.postalCode?.trim() || undefined,
-      phone: input.phone ? toDigits(input.phone) : undefined,
     };
   }
 
@@ -122,17 +116,10 @@ export function mapAutomaticFormToPaymentMethodRequest(input: {
     expiryMonth,
     expiryYear,
     holderName: `${input.firstName.trim()} ${input.lastName.trim()}`.trim(),
-    brand: input.cardType,
     last4: cardNumber.slice(-4),
     documentNumber: input.documentNumber
       ? toDigits(input.documentNumber)
       : undefined,
-    email: input.email?.trim() || undefined,
-    address: input.address?.trim() || undefined,
-    city: input.city?.trim() || undefined,
-    province: input.province?.trim() || undefined,
-    postalCode: input.postalCode?.trim() || undefined,
-    phone: input.phone ? toDigits(input.phone) : undefined,
     deviceFingerprintId: input.deviceFingerprintId?.trim() || undefined,
   };
 }
@@ -140,6 +127,8 @@ export function mapAutomaticFormToPaymentMethodRequest(input: {
 export function buildCashSandboxPayment(input: {
   amount: number;
   amountDue?: number;
+  discountAmount?: number;
+  discountReason?: string;
   createdBy?: string;
   reference?: string;
   notes?: string;
@@ -148,6 +137,8 @@ export function buildCashSandboxPayment(input: {
   return {
     amount: input.amount,
     amountDue: input.amountDue,
+    discountAmount: input.discountAmount,
+    discountReason: input.discountReason,
     method: "CASH",
     createdBy: normalizeManualPaymentCreatedBy(input.createdBy),
     reference: input.reference,
@@ -176,9 +167,6 @@ export function mapAutomaticFormToCreateGroupRequest(
         lastName: holderLastName,
         documentNumber: toDigits(payload.dni),
         birthDate: new Date().toISOString(),
-        address: payload.address.trim() || undefined,
-        email: payload.email.trim() || undefined,
-        phone: payload.phone.trim() || undefined,
         isHolder: true,
       },
     ],
@@ -193,18 +181,13 @@ export function mapAutomaticFormToCreateGroupRequest(
       cardCvv: payload.cardCvv,
       firstName: payload.firstName,
       lastName: payload.lastName,
-      cardType: payload.cardType,
       documentNumber: payload.dni,
-      email: payload.email,
-      address: payload.address,
-      city: payload.city,
-      province: payload.province,
-      postalCode: payload.postalCode,
-      phone: payload.phone,
       deviceFingerprintId: payload.deviceFingerprintId,
     }),
   };
 }
+
+export { buildAutomaticFallbackEmail };
 
 export function mapCashFormToCreateGroupRequest(
   payload: CashAffiliateGroupFormData,
@@ -227,6 +210,12 @@ export function mapCashFormToCreateGroupRequest(
         ? buildCashSandboxPayment({
             amount: Number(payload.paidAmount),
             amountDue: Number(payload.planAmount ?? 0),
+            discountAmount: Number(payload.discountAmount ?? 0),
+            discountReason:
+              Number(payload.discountAmount ?? 0) > 0
+                ? payload.discountReason?.trim() ||
+                  `Bonificación inicial del plan ${payload.plan}`
+                : undefined,
             createdBy: payload.seller,
             notes: `Pago manual inicial en efectivo del plan ${payload.plan}`,
           })

@@ -1,4 +1,5 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
+import { affiliatesService } from "../../api/affiliates.service";
 import * as groupDetailService from "../../api/groupDetail.service";
 import type { GroupDetailData } from "./AffiliateGroups.detail.types";
 
@@ -56,6 +57,71 @@ export const addAffiliateThunk = createAsyncThunk<
       return rejectWithValue({
         message:
           error?.response?.data?.message || "Error al agregar el afiliado",
+      });
+    }
+  },
+);
+
+export const registerManualPaymentThunk = createAsyncThunk<
+  GroupDetailData,
+  {
+    groupId: number;
+    payload: {
+      amount: number;
+      billingPeriodId?: number;
+      method: "CARD" | "CASH" | "TRANSFER";
+      paidAt: string;
+      createdBy?: string;
+      reference?: string;
+      notes?: string;
+    };
+  },
+  {
+    rejectValue: { message: string };
+  }
+>(
+  "groupDetail/registerManualPayment",
+  async ({ groupId, payload }, { rejectWithValue }) => {
+    try {
+      await affiliatesService.registerManualPayment(groupId, payload);
+      return await groupDetailService.getGroupDetail(groupId);
+    } catch (error: any) {
+      return rejectWithValue({
+        message:
+          error?.response?.data?.message || "Error al registrar el pago manual",
+      });
+    }
+  },
+);
+
+export const settleDebtThunk = createAsyncThunk<
+  GroupDetailData,
+  {
+    groupId: number;
+    payload: {
+      amount: number;
+      discountAmount?: number;
+      discountReason?: string;
+      method: "CARD" | "CASH" | "TRANSFER";
+      paidAt: string;
+      createdBy?: string;
+      reference?: string;
+      notes?: string;
+    };
+  },
+  {
+    rejectValue: { message: string };
+  }
+>(
+  "groupDetail/settleDebt",
+  async ({ groupId, payload }, { rejectWithValue }) => {
+    try {
+      await affiliatesService.settleDebt(groupId, payload);
+      return await groupDetailService.getGroupDetail(groupId);
+    } catch (error: any) {
+      return rejectWithValue({
+        message:
+          error?.response?.data?.message || "Error al saldar la deuda total",
       });
     }
   },

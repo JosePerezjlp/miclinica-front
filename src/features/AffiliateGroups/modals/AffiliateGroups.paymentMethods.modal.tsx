@@ -133,15 +133,15 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
           last4: isSiro
             ? formData.rawToken.replace(/\D/g, "").slice(-4)
             : formData.cardNumber.replace(/\D/g, "").slice(-4),
-          brand: isSiro ? "CBU" : formData.brand || undefined,
-          holderName: formData.holderName || groupData.holderFullName,
+          brand: isSiro ? "CBU" : undefined,
+          holderName: formData.holderName || undefined,
           documentNumber: formData.documentNumber || undefined,
-          email: formData.email || undefined,
-          address: formData.address || undefined,
-          city: formData.city || undefined,
-          province: formData.province || undefined,
-          postalCode: formData.postalCode || undefined,
-          phone: formData.phone || undefined,
+          email: isSiro ? formData.email || undefined : undefined,
+          address: undefined,
+          city: undefined,
+          province: undefined,
+          postalCode: undefined,
+          phone: undefined,
           deviceFingerprintId:
             formData.gateway === "PAYWAY"
               ? getOrCreatePaywayDeviceFingerprintId()
@@ -523,94 +523,22 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
                   <div className="grid grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="Marca (ej: Visa)"
-                      value={formData.brand}
-                      onChange={(e) =>
-                        setFormData({ ...formData, brand: e.target.value })
-                      }
-                      className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Nombre del Titular"
+                      placeholder="Nombre del Titular (opcional)"
                       value={formData.holderName}
                       onChange={(e) =>
                         setFormData({ ...formData, holderName: e.target.value })
                       }
                       className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
                     <input
                       type="text"
-                      placeholder="DNI titular"
+                      placeholder="DNI titular (opcional)"
                       value={formData.documentNumber}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
                           documentNumber: e.target.value,
                         })
-                      }
-                      className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                      className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      placeholder="Dirección"
-                      value={formData.address}
-                      onChange={(e) =>
-                        setFormData({ ...formData, address: e.target.value })
-                      }
-                      className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Ciudad"
-                      value={formData.city}
-                      onChange={(e) =>
-                        setFormData({ ...formData, city: e.target.value })
-                      }
-                      className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <input
-                      type="text"
-                      placeholder="Provincia"
-                      value={formData.province}
-                      onChange={(e) =>
-                        setFormData({ ...formData, province: e.target.value })
-                      }
-                      className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Código Postal"
-                      value={formData.postalCode}
-                      onChange={(e) =>
-                        setFormData({ ...formData, postalCode: e.target.value })
-                      }
-                      className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Teléfono"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
                       }
                       className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     />

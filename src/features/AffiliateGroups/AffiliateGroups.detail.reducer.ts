@@ -4,6 +4,8 @@ import {
   getGroupDetailThunk,
   updateGroupInfoThunk,
   addAffiliateThunk,
+  registerManualPaymentThunk,
+  settleDebtThunk,
   updateAffiliateThunk,
   removeAffiliateThunk,
   addPaymentMethodThunk,
@@ -99,6 +101,34 @@ const groupDetailSlice = createSlice({
         state.data = action.payload;
       })
       .addCase(removeAffiliateThunk.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || "Error desconocido";
+      })
+
+      // Register Manual Payment
+      .addCase(registerManualPaymentThunk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(registerManualPaymentThunk.fulfilled, (state, action) => {
+        state.loading = false;
+        state.data = action.payload;
+      })
+      .addCase(registerManualPaymentThunk.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || "Error desconocido";
+      })
+
+      // Settle Debt
+      .addCase(settleDebtThunk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(settleDebtThunk.fulfilled, (state, action) => {
+        state.loading = false;
+        state.data = action.payload;
+      })
+      .addCase(settleDebtThunk.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message || "Error desconocido";
       })

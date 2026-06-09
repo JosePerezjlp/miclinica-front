@@ -10,13 +10,11 @@ import { plansService } from "../../api/plans.service";
 import { promotersService } from "../../api/promoters.service";
 import {
   paymentGatewayOptions,
-  provinceOptions,
   sellerOptions,
   cityOptions,
 } from "./AffiliateGroups.constants";
 import type {
   AutomaticAffiliateGroupFormData,
-  CardType,
   CashAffiliateGroupFormData,
   CashMember,
   CreateGroupSubmitResult,
@@ -118,11 +116,10 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   onSubmit,
 }) => {
   const [mode, setMode] = useState<PaymentMode>("automatic");
-  const [cardType, setCardType] = useState<CardType>("prepaid");
 
   // Automatic payment form
   const [autoData, setAutoData] = useState<
-    Omit<AutomaticAffiliateGroupFormData, "mode" | "cardType">
+    Omit<AutomaticAffiliateGroupFormData, "mode">
   >({
     gateway: paymentGatewayOptions[0].value,
     plan: "",
@@ -138,12 +135,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     firstName: "",
     lastName: "",
     dni: "",
-    province: provinceOptions[0],
-    city: cityOptions[0],
-    email: "",
-    postalCode: "",
-    address: "",
-    phone: "",
     deviceFingerprintId: "",
   });
   const [mobbexSubscriptions, setMobbexSubscriptions] = useState<
@@ -173,6 +164,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     planId: undefined,
     planAmount: undefined,
     paidAmount: undefined,
+    discountAmount: undefined,
+    discountReason: "",
     city: cityOptions[0],
   });
 
@@ -246,10 +239,10 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   ) => {
     const { name, value } = e.target;
     setCashData((prev) => {
-      if (name === "paidAmount") {
+      if (name === "paidAmount" || name === "discountAmount") {
         return {
           ...prev,
-          paidAmount: parseCurrencyInput(value),
+          [name]: parseCurrencyInput(value),
         };
       }
 
@@ -276,9 +269,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
           planAmount: selectedPlan
             ? Number(selectedPlan.monthlyFee)
             : prev.planAmount,
-          paidAmount: selectedPlan
-            ? Number(selectedPlan.monthlyFee)
-            : prev.paidAmount,
+          paidAmount: 0,
+          discountAmount: 0,
+          discountReason: "",
         };
       }
 
@@ -471,7 +464,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       planId: firstPlan.id,
       plan: firstPlan.name,
       planAmount: Number(firstPlan.monthlyFee),
-      paidAmount: Number(firstPlan.monthlyFee),
+      paidAmount: 0,
+      discountAmount: 0,
     }));
   }, [mode, cashData.planId, localPlans]);
 
@@ -659,9 +653,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
           firstName: affiliate.firstName,
           lastName: affiliate.lastName,
           dni: affiliate.documentNumber,
-          email: affiliate.email || "",
-          address: affiliate.address || "",
-          phone: affiliate.phone || "",
         }));
         setAutoError("");
       } else {
@@ -867,7 +858,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
     const submitData = {
       mode: "automatic" as const,
-      cardType,
       ...autoData,
     };
 
@@ -931,12 +921,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       firstName: "",
       lastName: "",
       dni: "",
-      province: provinceOptions[0],
-      city: cityOptions[0],
-      email: "",
-      postalCode: "",
-      address: "",
-      phone: "",
       deviceFingerprintId: "",
     });
     setMobbexSubscriptions([]);
@@ -952,7 +936,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       plan: localPlans[0]?.name ?? "",
       planId: localPlans[0]?.id,
       planAmount: localPlans[0] ? Number(localPlans[0].monthlyFee) : undefined,
-      paidAmount: localPlans[0] ? Number(localPlans[0].monthlyFee) : undefined,
+      paidAmount: 0,
+      discountAmount: 0,
+      discountReason: "",
       city: cityOptions[0],
     });
     setMembers([]);
@@ -968,11 +954,13 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
   const planAmount = Number(cashData.planAmount ?? 0);
   const paidAmount = Number(cashData.paidAmount ?? 0);
-  const remainingAmount = Math.max(0, planAmount - paidAmount);
+  const discountAmount = Number(cashData.discountAmount ?? 0);
+  const coveredAmount = paidAmount + discountAmount;
+  const remainingAmount = Math.max(0, planAmount - coveredAmount);
   const isPartialCashPayment =
-    planAmount > 0 && paidAmount > 0 && paidAmount < planAmount;
-  const isCompleteCashPayment = planAmount > 0 && paidAmount === planAmount;
-  const exceedsPlanAmount = planAmount > 0 && paidAmount > planAmount;
+    planAmount > 0 && coveredAmount > 0 && coveredAmount < planAmount;
+  const isCompleteCashPayment = planAmount > 0 && coveredAmount === planAmount;
+  const exceedsPlanAmount = planAmount > 0 && coveredAmount > planAmount;
 
   const handleCopyMobbexLink = async () => {
     if (!generatedMobbexLink) {
@@ -1077,49 +1065,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
             className="px-6 py-6 space-y-6"
           >
             {/* Card type selection */}
-            {autoData.paymentMethod === "card" && (
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-3">
-                  Tipo de Tarjeta
-                </label>
-                <div className="flex gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={cardType === "credit"}
-                      onChange={() => setCardType("credit")}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-slate-700">
-                      Tarjeta de crédito
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={cardType === "debit"}
-                      onChange={() => setCardType("debit")}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-slate-700">
-                      Tarjeta de débito
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={cardType === "prepaid"}
-                      onChange={() => setCardType("prepaid")}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-slate-700">
-                      Tarjeta prepaga
-                    </span>
-                  </label>
-                </div>
-              </div>
-            )}
-
             {/* Gateway and plan */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1390,102 +1335,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               </div>
             </div>
 
-            {/* Province, email, postal */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Provincia
-                </label>
-                <select
-                  name="province"
-                  value={autoData.province}
-                  onChange={handleAutoChange}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {provinceOptions.map((prov) => (
-                    <option key={prov} value={prov}>
-                      {prov}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Ciudad
-                </label>
-                <select
-                  name="city"
-                  value={autoData.city}
-                  onChange={handleAutoChange}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {cityOptions.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={autoData.email}
-                  onChange={handleAutoChange}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Código Postal
-                </label>
-                <input
-                  type="text"
-                  name="postalCode"
-                  value={autoData.postalCode}
-                  onChange={handleAutoChange}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Dirección
-                </label>
-                <input
-                  type="text"
-                  name="address"
-                  value={autoData.address}
-                  onChange={handleAutoChange}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Teléfono
-                </label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={autoData.phone}
-                  onChange={handleAutoChange}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            {autoData.gateway === "PAYWAY" && (
-              <p className="text-sm text-slate-600">
-                Payway sandbox envía el identificador del dispositivo y usa
-                email, domicilio y ciudad del titular para fraude.
-              </p>
-            )}
-
             {/* Action buttons */}
             <div className="flex gap-3 pt-4 border-t border-slate-200">
               <button
@@ -1520,6 +1369,12 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
             onSubmit={handleSubmitCash}
             className="px-6 py-6 space-y-6"
           >
+            {cashError && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+                {cashError}
+              </div>
+            )}
+
             {/* Top selects */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1618,23 +1473,25 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Cuota del plan
-                </label>
-                <input
-                  type="text"
-                  readOnly
-                  value={planAmount > 0 ? planAmount.toFixed(2) : ""}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-100 text-slate-600"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Abonado
                 </label>
                 <input
                   type="text"
                   name="paidAmount"
                   value={cashData.paidAmount ?? ""}
+                  onChange={handleCashChange}
+                  placeholder="0.00"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Bonificación
+                </label>
+                <input
+                  type="text"
+                  name="discountAmount"
+                  value={cashData.discountAmount ?? ""}
                   onChange={handleCashChange}
                   placeholder="0.00"
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
@@ -1653,6 +1510,20 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               </div>
             </div>
 
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Motivo bonificación (opcional)
+              </label>
+              <input
+                type="text"
+                name="discountReason"
+                value={cashData.discountReason ?? ""}
+                onChange={handleCashChange}
+                placeholder="Ej. Bonificación comercial por alta"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              />
+            </div>
+
             {planAmount > 0 && paidAmount > 0 && (
               <div
                 className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
@@ -1666,12 +1537,12 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                 }`}
               >
                 {exceedsPlanAmount
-                  ? "El abonado no puede exceder la cuota del plan."
+                  ? "La suma de abonado y bonificación no puede exceder la cuota del plan."
                   : isPartialCashPayment
-                    ? `Pago parcial: abonó $${paidAmount.toFixed(2)} y quedan $${remainingAmount.toFixed(2)} pendientes.`
+                    ? `Pago parcial: abonó $${paidAmount.toFixed(2)}, bonificó $${discountAmount.toFixed(2)} y quedan $${remainingAmount.toFixed(2)} pendientes.`
                     : isCompleteCashPayment
-                      ? `Pago completo: la cuota de $${planAmount.toFixed(2)} quedó saldada.`
-                      : "Ingresá el monto abonado para calcular el estado del pago."}
+                      ? `Pago completo: entre abonado y bonificación se saldó la cuota de $${planAmount.toFixed(2)}.`
+                      : "Ingresá el abonado y/o la bonificación para calcular el saldo restante."}
               </div>
             )}
 

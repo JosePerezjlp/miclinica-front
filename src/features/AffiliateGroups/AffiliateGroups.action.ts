@@ -2,6 +2,7 @@ import type { Action } from "redux";
 import type { ThunkAction } from "redux-thunk";
 import toast from "react-hot-toast";
 import {
+  buildAutomaticFallbackEmail,
   mapAutomaticFormToCreateGroupRequest,
   mapCashFormToCreateGroupRequest,
 } from "../../api/affiliateGroups.mappers";
@@ -80,7 +81,11 @@ export const onCreateGroupThunk =
           payload.mobbexSubscriptionId,
           {
             customer: {
-              email: payload.email.trim(),
+              email: buildAutomaticFallbackEmail({
+                firstName: payload.firstName,
+                lastName: payload.lastName,
+                documentNumber: payload.dni,
+              }),
               name: `${payload.firstName.trim()} ${payload.lastName.trim()}`.trim(),
               identification: toDigits(payload.dni),
             },

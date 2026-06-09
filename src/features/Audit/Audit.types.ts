@@ -55,6 +55,15 @@ export interface ManualPaymentData {
   reference?: string | null;
 }
 
+export interface DiscountData {
+  id: number;
+  amount: string;
+  type: string;
+  appliedBy: string;
+  reason?: string | null;
+  createdAt: string;
+}
+
 export interface FamiliarGroupData {
   id: number;
   name: string;
@@ -76,6 +85,7 @@ export interface TransactionDetail {
   familiarGroup: FamiliarGroupData;
   billingPeriod?: BillingPeriodData | null;
   manualPayment?: ManualPaymentData | null;
+  discount?: DiscountData | null;
   chargeAttempts?: ChargeAttempt[];
 }
 

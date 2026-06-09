@@ -30,7 +30,7 @@ const AuditSummaryView: React.FC<Props> = ({ data }) => {
 
   const debitAmount = parseFloat(data.totalDebit);
   const creditAmount = parseFloat(data.totalCredit);
-  const netBalance = debitAmount - creditAmount;
+  const outstandingBalance = Math.max(debitAmount - creditAmount, 0);
 
   return (
     <div className="space-y-6">
@@ -51,12 +51,12 @@ const AuditSummaryView: React.FC<Props> = ({ data }) => {
           </div>
         </div>
 
-        {/* Total Debit */}
+        {/* Total To Collect */}
         <div className="bg-white rounded-lg border border-slate-200 p-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xs font-semibold text-red-600 uppercase">
-                Total Débitos
+                Total a Cobrar
               </div>
               <div className="text-3xl font-bold text-red-600 mt-1">
                 {formatCurrency(debitAmount)}
@@ -66,12 +66,12 @@ const AuditSummaryView: React.FC<Props> = ({ data }) => {
           </div>
         </div>
 
-        {/* Total Credit */}
+        {/* Total Collected */}
         <div className="bg-white rounded-lg border border-slate-200 p-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xs font-semibold text-emerald-600 uppercase">
-                Total Créditos
+                Total Cobrado
               </div>
               <div className="text-3xl font-bold text-emerald-600 mt-1">
                 {formatCurrency(creditAmount)}
@@ -111,34 +111,34 @@ const AuditSummaryView: React.FC<Props> = ({ data }) => {
           </div>
         </div>
 
-        {/* Net Balance */}
+        {/* Outstanding Balance */}
         <div className={`rounded-lg border p-4 ${
-          netBalance >= 0
-            ? "bg-emerald-50 border-emerald-200"
-            : "bg-red-50 border-red-200"
+          outstandingBalance > 0
+            ? "bg-amber-50 border-amber-200"
+            : "bg-emerald-50 border-emerald-200"
         }`}>
           <div className="flex items-center justify-between">
             <div>
               <div className={`text-xs font-semibold uppercase ${
-                netBalance >= 0 ? "text-emerald-600" : "text-red-600"
+                outstandingBalance > 0 ? "text-amber-700" : "text-emerald-600"
               }`}>
-                Saldo Neto
+                Saldo a Cobrar
               </div>
               <div className={`text-3xl font-bold mt-1 ${
-                netBalance >= 0 ? "text-emerald-600" : "text-red-600"
+                outstandingBalance > 0 ? "text-amber-700" : "text-emerald-600"
               }`}>
-                {formatCurrency(Math.abs(netBalance))}
+                {formatCurrency(outstandingBalance)}
               </div>
               <div className={`text-xs mt-1 ${
-                netBalance >= 0 ? "text-emerald-700" : "text-red-700"
+                outstandingBalance > 0 ? "text-amber-800" : "text-emerald-700"
               }`}>
-                {netBalance >= 0 ? "A favor" : "En contra"}
+                {outstandingBalance > 0 ? "Pendiente de cobro" : "Sin saldo pendiente"}
               </div>
             </div>
-            {netBalance >= 0 ? (
-              <TrendingUp className="w-8 h-8 text-emerald-200" />
+            {outstandingBalance > 0 ? (
+              <TrendingDown className="w-8 h-8 text-amber-200" />
             ) : (
-              <TrendingDown className="w-8 h-8 text-red-200" />
+              <TrendingUp className="w-8 h-8 text-emerald-200" />
             )}
           </div>
         </div>
@@ -183,10 +183,10 @@ const AuditSummaryView: React.FC<Props> = ({ data }) => {
                     Transacciones
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-bold text-slate-700">
-                    Débitos
+                    Total a cobrar
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-bold text-slate-700">
-                    Créditos
+                    Total cobrado
                   </th>
                 </tr>
               </thead>

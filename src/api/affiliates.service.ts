@@ -3,6 +3,7 @@ import type {
   CreateAffiliateRequest,
   CreateManualPaymentRequest,
   ManualPaymentResponse,
+  SettleDebtRequest,
   UpdateAffiliateRequest,
 } from "../features/AffiliateGroups/AffiliateGroups.types";
 
@@ -45,10 +46,9 @@ export const affiliatesService = {
   },
 
   async findByDocumentNumber(documentNumber: string) {
-    const { data } = await apiClient.get<AffiliateResponse[]>(
-      `/affiliates`,
-      { params: { documentNumber } },
-    );
+    const { data } = await apiClient.get<AffiliateResponse[]>(`/affiliates`, {
+      params: { documentNumber },
+    });
     return data;
   },
 
@@ -92,6 +92,14 @@ export const affiliatesService = {
   async listManualPayments(groupId: number) {
     const { data } = await apiClient.get<ManualPaymentResponse[]>(
       `/groups/${groupId}/billing/manual-payments`,
+    );
+    return data;
+  },
+
+  async settleDebt(groupId: number, payload: SettleDebtRequest) {
+    const { data } = await apiClient.post(
+      `/groups/${groupId}/billing/settlements`,
+      payload,
     );
     return data;
   },

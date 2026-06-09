@@ -5,11 +5,22 @@ export interface GroupDetailData {
   name: string;
   holderFullName: string;
   isActive: boolean;
+  chargeDay: number;
   planId: number | null;
+  promoterId: number | null;
   planStatus: string;
   gracePeriodEndsAt: string | null;
   rating: string;
   ratingUpdatedAt: string | null;
+  promoter: {
+    id: number;
+    createdAt: string;
+    updatedAt: string;
+    name: string;
+    percentage: number;
+    isActive: boolean;
+    isInternal: boolean;
+  } | null;
   plan: {
     id: number;
     name: string;
@@ -55,6 +66,7 @@ export interface GroupDetailData {
     familiarGroupId: number;
     month: number;
     year: number;
+    dueDate: string;
     amountDue: number;
     status: string;
   }>;
@@ -99,12 +111,12 @@ export interface GroupDetailData {
   discounts: Array<{
     id: number;
     familiarGroupId: number;
-    reason: string;
+    billingPeriodId: number | null;
+    type: string;
     amount: number;
-    startDate: string;
-    endDate: string | null;
+    reason: string | null;
+    appliedBy: string;
     createdAt: string;
-    updatedAt: string;
   }>;
 }
 
@@ -118,6 +130,7 @@ export interface UpdateGroupInfoPayload {
   name?: string;
   holderFullName?: string;
   isActive?: boolean;
+  chargeDay?: number;
 }
 
 export interface AddAffiliatePayload {
