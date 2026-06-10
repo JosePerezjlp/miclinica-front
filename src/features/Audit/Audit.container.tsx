@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Download, Filter } from "lucide-react";
+import { Download, Filter, MapPin } from "lucide-react";
 import type { AppDispatch, RootState } from "../../store/store";
 import {
   getAuditTransactionsThunk,
@@ -15,11 +15,15 @@ import {
   VIEW_OPTIONS,
   CURRENT_MONTH,
   CURRENT_YEAR,
+  DEBT_FILTER_OPTIONS,
+  CHARGE_DAY_RANGES,
 } from "./Audit.constants";
 import AuditTransactionsView from "./views/Audit.transactions";
 import AuditSummaryView from "./views/Audit.summary";
 import { promotersService } from "../../api/promoters.service";
 import { familiarGroupGet } from "../../api/groups.service";
+import { citiesService } from "../../api/cities.service";
+import type { CityResponse } from "../Cities/Cities.types";
 
 interface SelectOption {
   label: string;
@@ -34,10 +38,10 @@ const AuditContainer: React.FC = () => {
 
   const [familiarGroups, setFamiliarGroups] = useState<SelectOption[]>([]);
   const [promoters, setPromoters] = useState<SelectOption[]>([]);
+  const [cities, setCities] = useState<CityResponse[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [promotersLoading, setPromotersLoading] = useState(false);
 
-  // Load familiar groups
   useEffect(() => {
     const loadGroups = async () => {
       try {
@@ -59,7 +63,6 @@ const AuditContainer: React.FC = () => {
     loadGroups();
   }, []);
 
-  // Load promoters
   useEffect(() => {
     const loadPromoters = async () => {
       try {
@@ -79,13 +82,27 @@ const AuditContainer: React.FC = () => {
     loadPromoters();
   }, []);
 
-  // Load data when filters change
+  useEffect(() => {
+    const loadCities = async () => {
+      try {
+        const response = await citiesService.list();
+        setCities(response.filter((c) => c.isActive));
+      } catch (error) {
+        console.error("Error loading cities:", error);
+      }
+    };
+    loadCities();
+  }, []);
+
   useEffect(() => {
     const newFilters: AuditFiltersData = {
       familiarGroupId: filters.familiarGroupId,
       promoterId: filters.promoterId,
       month: filters.month || CURRENT_MONTH,
       year: filters.year || CURRENT_YEAR,
+      cityId: filters.cityId,
+      debtFilter: filters.debtFilter,
+      chargeDayRange: filters.chargeDayRange,
     };
 
     if (view === "transactions") {
@@ -97,7 +114,7 @@ const AuditContainer: React.FC = () => {
 
   const handleFilterChange = (
     key: keyof AuditFiltersData,
-    value: number | undefined,
+    value: number | string | undefined,
   ) => {
     const newFilters = {
       ...filters,
@@ -111,7 +128,6 @@ const AuditContainer: React.FC = () => {
   };
 
   const handleExport = () => {
-    // TODO: Implement export functionality
     console.log("Export functionality to be implemented");
   };
 
@@ -168,107 +184,193 @@ const AuditContainer: React.FC = () => {
 
       {/* Filters */}
       <div className="bg-white rounded-lg border border-slate-200 p-4">
-        <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-          <Filter className="w-5 h-5 text-slate-400 sm:mb-0 -mb-1" />
+        <div className="flex flex-col gap-4">
+          {/* Row 1: Main filters */}
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+            <Filter className="w-5 h-5 text-slate-400 sm:mb-0 -mb-1" />
 
-          {/* Familiar Group */}
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Grupo Familiar
-            </label>
-            <select
-              value={filters.familiarGroupId || ""}
-              onChange={(e) =>
-                handleFilterChange(
-                  "familiarGroupId",
-                  e.target.value ? parseInt(e.target.value, 10) : undefined,
-                )
-              }
-              disabled={groupsLoading}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm disabled:opacity-50"
-            >
-              <option value="">Todos los grupos</option>
-              {familiarGroups.map((group) => (
-                <option key={group.value} value={group.value}>
-                  {group.label}
-                </option>
-              ))}
-            </select>
+            {/* Familiar Group */}
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Grupo Familiar
+              </label>
+              <select
+                value={filters.familiarGroupId || ""}
+                onChange={(e) =>
+                  handleFilterChange(
+                    "familiarGroupId",
+                    e.target.value ? parseInt(e.target.value, 10) : undefined,
+                  )
+                }
+                disabled={groupsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm disabled:opacity-50"
+              >
+                <option value="">Todos los grupos</option>
+                {familiarGroups.map((group) => (
+                  <option key={group.value} value={group.value}>
+                    {group.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Promoter */}
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Promotor
+              </label>
+              <select
+                value={filters.promoterId || ""}
+                onChange={(e) =>
+                  handleFilterChange(
+                    "promoterId",
+                    e.target.value ? parseInt(e.target.value, 10) : undefined,
+                  )
+                }
+                disabled={promotersLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm disabled:opacity-50"
+              >
+                <option value="">Todos los promotores</option>
+                {promoters.map((promoter) => (
+                  <option key={promoter.value} value={promoter.value}>
+                    {promoter.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* City */}
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" />
+                  Ciudad
+                </span>
+              </label>
+              <select
+                value={filters.cityId || ""}
+                onChange={(e) =>
+                  handleFilterChange(
+                    "cityId",
+                    e.target.value ? parseInt(e.target.value, 10) : undefined,
+                  )
+                }
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm"
+              >
+                <option value="">Todas las ciudades</option>
+                {cities.map((city) => (
+                  <option key={city.id} value={city.id}>
+                    {city.name} ({city.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Month */}
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Mes
+              </label>
+              <select
+                value={filters.month || CURRENT_MONTH}
+                onChange={(e) =>
+                  handleFilterChange("month", parseInt(e.target.value, 10))
+                }
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm"
+              >
+                {MONTHS_OPTIONS.map((month) => (
+                  <option key={month.value} value={month.value}>
+                    {month.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Year */}
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Año
+              </label>
+              <select
+                value={filters.year || CURRENT_YEAR}
+                onChange={(e) =>
+                  handleFilterChange("year", parseInt(e.target.value, 10))
+                }
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm"
+              >
+                {YEAR_OPTIONS.map((year) => (
+                  <option key={year.value} value={year.value}>
+                    {year.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* Promoter */}
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Promotor
-            </label>
-            <select
-              value={filters.promoterId || ""}
-              onChange={(e) =>
-                handleFilterChange(
-                  "promoterId",
-                  e.target.value ? parseInt(e.target.value, 10) : undefined,
-                )
-              }
-              disabled={promotersLoading}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm disabled:opacity-50"
-            >
-              <option value="">Todos los promotores</option>
-              {promoters.map((promoter) => (
-                <option key={promoter.value} value={promoter.value}>
-                  {promoter.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Row 2: Debt filter + Charge day ranges */}
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+            {/* Debt Filter */}
+            <div className="min-w-[180px]">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Estado de Deuda
+              </label>
+              <select
+                value={filters.debtFilter || ""}
+                onChange={(e) =>
+                  handleFilterChange(
+                    "debtFilter",
+                    e.target.value || undefined,
+                  )
+                }
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm"
+              >
+                {DEBT_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Month */}
-          <div className="flex-1 min-w-[150px]">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Mes
-            </label>
-            <select
-              value={filters.month || CURRENT_MONTH}
-              onChange={(e) =>
-                handleFilterChange("month", parseInt(e.target.value, 10))
-              }
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm"
-            >
-              {MONTHS_OPTIONS.map((month) => (
-                <option key={month.value} value={month.value}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
-          </div>
+            {/* Charge Day Ranges */}
+            <div className="flex-1">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Día de Cobro
+              </label>
+              <div className="flex gap-2">
+                {CHARGE_DAY_RANGES.map((range) => (
+                  <button
+                    key={range.value}
+                    type="button"
+                    onClick={() =>
+                      handleFilterChange(
+                        "chargeDayRange",
+                        filters.chargeDayRange === range.value
+                          ? undefined
+                          : range.value,
+                      )
+                    }
+                    className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-colors ${
+                      filters.chargeDayRange === range.value
+                        ? "bg-teal-600 text-white border-teal-600"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    {range.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          {/* Year */}
-          <div className="flex-1 min-w-[150px]">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Año
-            </label>
-            <select
-              value={filters.year || CURRENT_YEAR}
-              onChange={(e) =>
-                handleFilterChange("year", parseInt(e.target.value, 10))
-              }
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm"
+            {/* Clear Button */}
+            <button
+              onClick={handleClearFilters}
+              type="button"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-lg transition-colors"
             >
-              {YEAR_OPTIONS.map((year) => (
-                <option key={year.value} value={year.value}>
-                  {year.label}
-                </option>
-              ))}
-            </select>
+              Limpiar
+            </button>
           </div>
-
-          {/* Clear Button */}
-          <button
-            onClick={handleClearFilters}
-            type="button"
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-lg transition-colors"
-          >
-            Limpiar
-          </button>
         </div>
       </div>
 

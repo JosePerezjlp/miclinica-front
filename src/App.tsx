@@ -6,6 +6,7 @@ import DashboardContainer from "./features/Dashboard/Dashboard.container";
 import AffiliateGroupsContainer from "./features/AffiliateGroups/AffiliateGroups.container";
 import PlansContainer from "./features/Plans/Plans.container";
 import PromotersContainer from "./features/Promoters/Promoters.container";
+import CitiesContainer from "./features/Cities/Cities.container";
 import UsersContainer from "./features/Users/Users.container";
 import RolesContainer from "./features/Roles/Roles.container";
 import ModulesContainer from "./features/Modules/Modules.container";
@@ -86,6 +87,16 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <PromotersContainer />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cities"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <CitiesContainer />
               </DashboardLayout>
             </ProtectedRoute>
           }

@@ -61,6 +61,7 @@ export interface CashAffiliateGroupFormData {
   discountAmount?: number;
   discountReason?: string;
   city: string;
+  cityId?: number | null;
   members: CashMember[];
 }
 
@@ -84,6 +85,7 @@ export interface CreateGroupRequest {
   holderFullName?: string;
   planId?: number;
   promoterId?: number;
+  cityId?: number | null;
   planName?: string;
   affiliates: CreateAffiliateRequest[];
   paymentMethod?: CreateGroupPaymentMethodRequest;
@@ -96,6 +98,7 @@ export interface GroupResponse {
   holderFullName: string;
   planId?: number | null;
   promoterId?: number | null;
+  cityId?: number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -105,6 +108,11 @@ export interface GroupResponse {
     percentage: number | string;
     isActive: boolean;
     isInternal: boolean;
+  } | null;
+  city?: {
+    id: number;
+    name: string;
+    code: string;
   } | null;
   plan?: {
     id?: number;

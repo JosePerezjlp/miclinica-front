@@ -26,6 +26,7 @@ export type ChargeAttemptResult =
 
 export type PaymentGateway = "SIRO" | "PAYWAY" | "MOBBEX";
 export type ManualPaymentMethod = "CARD" | "CASH" | "TRANSFER";
+export type DebtFilter = "debe" | "no_debe";
 
 export interface ChargeAttempt {
   id: number;
@@ -73,6 +74,13 @@ export interface FamiliarGroupData {
     id: number;
     name: string;
   } | null;
+  cityId?: number | null;
+  city?: {
+    id: number;
+    name: string;
+    code: string;
+  } | null;
+  chargeDay?: number | null;
 }
 
 export interface TransactionDetail {
@@ -108,6 +116,7 @@ export interface AuditSummary {
   totalTransactions: number;
   totalDebit: string;
   totalCredit: string;
+  totalBonification: string;
   failedAttempts: number;
   successAttempts: number;
   periodStart: string;
@@ -120,6 +129,9 @@ export interface AuditFiltersData {
   promoterId?: number;
   month?: number;
   year?: number;
+  cityId?: number;
+  debtFilter?: DebtFilter;
+  chargeDayRange?: string;
 }
 
 export type AuditView = "transactions" | "summary";

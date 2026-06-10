@@ -167,6 +167,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     discountAmount: undefined,
     discountReason: "",
     city: cityOptions[0],
+    cityId: null,
   });
 
   const [members, setMembers] = useState<CashMember[]>([]);
@@ -255,6 +256,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
           ...prev,
           promoterId: selectedPromoter?.id,
           promoterName: selectedPromoter?.name ?? prev.promoterName,
+          cityId: selectedPromoter?.cityId ?? null,
+          city: selectedPromoter?.city?.name ?? cityOptions[0],
         };
       }
 
@@ -382,6 +385,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               ...prev,
               promoterId: firstPromoter.id,
               promoterName: firstPromoter.name,
+              cityId: firstPromoter.cityId ?? null,
+              city: firstPromoter.city?.name ?? cityOptions[0],
             };
           });
         }
@@ -939,7 +944,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       paidAmount: 0,
       discountAmount: 0,
       discountReason: "",
-      city: cityOptions[0],
+      city: localPromoters[0]?.city?.name ?? cityOptions[0],
+      cityId: localPromoters[0]?.cityId ?? null,
     });
     setMembers([]);
     setMemberDraft(emptyCashMember);
@@ -1453,20 +1459,24 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Ciudad
+                  Ciudad (del promotor)
                 </label>
-                <select
-                  name="city"
-                  value={cashData.city}
-                  onChange={handleCashChange}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {cityOptions.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  readOnly
+                  value={cashData.city || "Sin ciudad asignada"}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-600 cursor-not-allowed"
+                />
+                {cashData.cityId && (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Ciudad asignada al promotor seleccionado
+                  </p>
+                )}
+                {!cashData.cityId && cashData.promoterId && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    El promotor seleccionado no tiene ciudad asignada
+                  </p>
+                )}
               </div>
             </div>
 

@@ -204,6 +204,7 @@ export function mapCashFormToCreateGroupRequest(
     holderFullName,
     planId: payload.planId,
     promoterId: payload.promoterId,
+    cityId: payload.cityId,
     affiliates: mapCashFormToAffiliateRequests(payload),
     initialManualPayment:
       Number(payload.paidAmount ?? 0) > 0

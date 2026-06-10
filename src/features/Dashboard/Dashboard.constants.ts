@@ -9,6 +9,7 @@ import {
   Landmark,
   LayoutDashboard,
   ListChecks,
+  MapPin,
   Megaphone,
   NotebookPen,
   ScanText,
@@ -65,6 +66,7 @@ export const sideSections: DashboardSideSection[] = [
       { label: "Afiliacion Online", icon: NotebookPen },
       { label: "Cobradores", icon: Briefcase },
       { label: "Promotores", icon: Megaphone, path: "/promoters" },
+      { label: "Ciudades", icon: MapPin, path: "/cities" },
     ],
   },
   {

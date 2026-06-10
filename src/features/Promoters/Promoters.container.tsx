@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  MapPin,
   Megaphone,
   Pencil,
   Plus,
@@ -14,6 +15,7 @@ import {
   getPromotersThunk,
   updatePromoterThunk,
 } from "./Promoters.action";
+import { getCitiesThunk } from "../Cities/Cities.action";
 import type {
   CreatePromoterRequest,
   PromoterResponse,
@@ -24,6 +26,7 @@ type PromoterFormState = {
   percentage: string;
   isActive: boolean;
   isInternal: boolean;
+  cityId: string;
 };
 
 const emptyForm: PromoterFormState = {
@@ -31,6 +34,7 @@ const emptyForm: PromoterFormState = {
   percentage: "",
   isActive: true,
   isInternal: false,
+  cityId: "",
 };
 
 function buildForm(promoter?: PromoterResponse): PromoterFormState {
@@ -43,6 +47,7 @@ function buildForm(promoter?: PromoterResponse): PromoterFormState {
     percentage: String(promoter.percentage),
     isActive: promoter.isActive,
     isInternal: promoter.isInternal,
+    cityId: promoter.cityId ? String(promoter.cityId) : "",
   };
 }
 
@@ -51,6 +56,7 @@ const PromotersContainer = () => {
   const { data, loading, saveLoading } = useAppSelector(
     (state) => state.promoters,
   );
+  const { data: cities } = useAppSelector((state) => state.cities);
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<
@@ -66,6 +72,7 @@ const PromotersContainer = () => {
 
   useEffect(() => {
     dispatch(getPromotersThunk());
+    dispatch(getCitiesThunk());
   }, [dispatch]);
 
   const filteredPromoters = data.filter((promoter) => {
@@ -73,7 +80,8 @@ const PromotersContainer = () => {
     const matchesQuery =
       !normalizedQuery ||
       promoter.name.toLowerCase().includes(normalizedQuery) ||
-      String(promoter.id).includes(normalizedQuery);
+      String(promoter.id).includes(normalizedQuery) ||
+      promoter.city?.name.toLowerCase().includes(normalizedQuery);
     const matchesStatus =
       statusFilter === "all" ||
       (statusFilter === "active" ? promoter.isActive : !promoter.isActive);
@@ -112,6 +120,7 @@ const PromotersContainer = () => {
       percentage: Number(form.percentage),
       isActive: form.isActive,
       isInternal: form.isInternal,
+      cityId: form.cityId ? Number(form.cityId) : null,
     };
 
     if (!payload.name || Number.isNaN(payload.percentage)) {
@@ -135,6 +144,8 @@ const PromotersContainer = () => {
 
     await dispatch(updatePromoterThunk(promoter.id, { isActive: true }));
   };
+
+  const activeCities = cities.filter((c) => c.isActive);
 
   return (
     <div className="w-full px-6 py-6 space-y-5">
@@ -164,7 +175,7 @@ const PromotersContainer = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por nombre o ID"
+              placeholder="Buscar por nombre, ID o ciudad"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               className="w-full h-10 pl-9 pr-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -206,6 +217,7 @@ const PromotersContainer = () => {
               <tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-6 py-3 font-semibold">#</th>
                 <th className="px-4 py-3 font-semibold">Promotor</th>
+                <th className="px-4 py-3 font-semibold">Ciudad</th>
                 <th className="px-4 py-3 font-semibold">Porcentaje</th>
                 <th className="px-4 py-3 font-semibold">Tipo</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
@@ -230,6 +242,19 @@ const PromotersContainer = () => {
                       <Megaphone className="w-3 h-3" />
                       {promoter.isInternal ? "Gestión interna" : "Red externa"}
                     </div>
+                  </td>
+                  <td className="px-4 py-4">
+                    {promoter.city ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                        <MapPin className="w-3 h-3" />
+                        {promoter.city.name}
+                        <span className="text-blue-400 font-mono">
+                          {promoter.city.code}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-4 text-slate-700 font-semibold">
                     {Number(promoter.percentage).toFixed(2)}%
@@ -303,8 +328,8 @@ const PromotersContainer = () => {
                 {editingPromoter ? "Editar promotor" : "Crear promotor"}
               </h2>
               <p className="text-sm text-slate-500 mt-1">
-                Definí el porcentaje comercial, estado y si pertenece a la
-                estructura interna.
+                Definí el porcentaje comercial, ciudad, estado y si pertenece a
+                la estructura interna.
               </p>
             </div>
 
@@ -339,6 +364,27 @@ const PromotersContainer = () => {
                   }
                   className="w-full h-11 px-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </label>
+
+              <label className="space-y-2 text-sm text-slate-700 font-medium">
+                <span>Ciudad</span>
+                <select
+                  value={form.cityId}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      cityId: event.target.value,
+                    }))
+                  }
+                  className="w-full h-11 px-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Sin ciudad asignada</option>
+                  {activeCities.map((city) => (
+                    <option key={city.id} value={city.id}>
+                      {city.name} ({city.code})
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <div className="space-y-3 text-sm text-slate-700 font-medium">

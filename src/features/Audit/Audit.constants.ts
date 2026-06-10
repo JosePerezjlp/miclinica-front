@@ -1,4 +1,4 @@
-import type { AuditView } from "./Audit.types";
+import type { AuditView, DebtFilter } from "./Audit.types";
 
 export const CURRENT_YEAR = new Date().getFullYear();
 export const CURRENT_MONTH = new Date().getMonth() + 1;
@@ -104,3 +104,16 @@ export const MANUAL_PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "Efectivo",
   TRANSFER: "Transferencia",
 };
+
+export const DEBT_FILTER_OPTIONS: Array<{ label: string; value: DebtFilter | "" }> = [
+  { label: "Todos", value: "" },
+  { label: "Debe", value: "debe" },
+  { label: "No debe", value: "no_debe" },
+];
+
+export const CHARGE_DAY_RANGES: Array<{ label: string; value: string }> = [
+  { label: "1 al 5", value: "1-5" },
+  { label: "5 al 15", value: "5-15" },
+  { label: "15 al 23", value: "15-23" },
+  { label: "23 a fin", value: "23-fin" },
+];

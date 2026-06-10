@@ -9,6 +9,7 @@ import { rolesReducer } from "../features/Roles/Roles.reducer";
 import { accessModulesReducer } from "../features/Modules/Modules.reducer";
 import groupDetailReducer from "../features/AffiliateGroups/AffiliateGroups.detail.reducer";
 import { auditReducer } from "../features/Audit/Audit.reducer";
+import { citiesReducer } from "../features/Cities/Cities.reducer";
 
 export const store = configureStore({
   reducer: {
@@ -22,6 +23,7 @@ export const store = configureStore({
     accessModules: accessModulesReducer,
     groupDetail: groupDetailReducer,
     audit: auditReducer,
+    cities: citiesReducer,
   },
 });
 

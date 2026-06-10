@@ -25,6 +25,15 @@ class AuditService {
     if (filters.year) {
       params.append("year", filters.year.toString());
     }
+    if (filters.cityId) {
+      params.append("cityId", filters.cityId.toString());
+    }
+    if (filters.debtFilter) {
+      params.append("debtFilter", filters.debtFilter);
+    }
+    if (filters.chargeDayRange) {
+      params.append("chargeDayRange", filters.chargeDayRange);
+    }
 
     params.append("skip", skip.toString());
     params.append("take", take.toString());
@@ -50,6 +59,15 @@ class AuditService {
     }
     if (filters.year) {
       params.append("year", filters.year.toString());
+    }
+    if (filters.cityId) {
+      params.append("cityId", filters.cityId.toString());
+    }
+    if (filters.debtFilter) {
+      params.append("debtFilter", filters.debtFilter);
+    }
+    if (filters.chargeDayRange) {
+      params.append("chargeDayRange", filters.chargeDayRange);
     }
 
     const { data } = await apiClient.get<AuditSummary>(

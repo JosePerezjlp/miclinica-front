@@ -5,6 +5,7 @@ import {
   AlertCircle,
   CheckCircle,
   Calendar,
+  Gift,
 } from "lucide-react";
 import type { AuditSummary } from "../Audit.types";
 
@@ -20,16 +21,9 @@ const AuditSummaryView: React.FC<Props> = ({ data }) => {
     }).format(parseFloat(amount.toString()));
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("es-AR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  };
-
   const debitAmount = parseFloat(data.totalDebit);
   const creditAmount = parseFloat(data.totalCredit);
+  const bonificationAmount = parseFloat(data.totalBonification ?? "0");
   const outstandingBalance = Math.max(debitAmount - creditAmount, 0);
 
   return (
@@ -111,6 +105,21 @@ const AuditSummaryView: React.FC<Props> = ({ data }) => {
           </div>
         </div>
 
+        {/* Bonification */}
+        <div className="bg-white rounded-lg border border-purple-200 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs font-semibold text-purple-600 uppercase">
+                Total Bonificaciones
+              </div>
+              <div className="text-3xl font-bold text-purple-600 mt-1">
+                {formatCurrency(bonificationAmount)}
+              </div>
+            </div>
+            <Gift className="w-8 h-8 text-purple-200" />
+          </div>
+        </div>
+
         {/* Outstanding Balance */}
         <div className={`rounded-lg border p-4 ${
           outstandingBalance > 0
@@ -141,23 +150,6 @@ const AuditSummaryView: React.FC<Props> = ({ data }) => {
               <TrendingUp className="w-8 h-8 text-emerald-200" />
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Period Info */}
-      <div className="bg-white rounded-lg border border-slate-200 p-4">
-        <div className="text-xs font-bold text-slate-700 mb-3">
-          PERÍODO DE COBERTURA
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-slate-600">Desde:</span>
-          <span className="font-semibold text-slate-900">
-            {formatDate(data.periodStart)}
-          </span>
-          <span className="text-slate-600">Hasta:</span>
-          <span className="font-semibold text-slate-900">
-            {formatDate(data.periodEnd)}
-          </span>
         </div>
       </div>
 
