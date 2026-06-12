@@ -152,6 +152,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const [generatedMobbexLink, setGeneratedMobbexLink] = useState("");
   const [copyFeedback, setCopyFeedback] = useState("");
   const [detectedCardBrand, setDetectedCardBrand] = useState("");
+  const [detectedCardType, setDetectedCardType] = useState<"credit" | "debit" | "prepaid" | null>(null);
+  const [detectedPaywayMethodId, setDetectedPaywayMethodId] = useState<number | null>(null);
 
   // Cash payment form
   const [cashData, setCashData] = useState<
@@ -550,6 +552,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   useEffect(() => {
     if (mode !== "automatic" || autoData.paymentMethod !== "card") {
       setDetectedCardBrand("");
+      setDetectedCardType(null);
+      setDetectedPaywayMethodId(null);
       return;
     }
 
@@ -557,6 +561,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
     if (digits.length < 4) {
       setDetectedCardBrand("");
+      setDetectedCardType(null);
+      setDetectedPaywayMethodId(null);
       return;
     }
 
@@ -569,10 +575,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
         if (!cancelled) {
           setDetectedCardBrand(response.brand ?? "");
+          setDetectedCardType(digits.length >= 6 ? response.type : null);
+          setDetectedPaywayMethodId(digits.length >= 6 ? response.paywayPaymentMethodId : null);
         }
       } catch {
         if (!cancelled) {
           setDetectedCardBrand("");
+          setDetectedCardType(null);
+          setDetectedPaywayMethodId(null);
         }
       }
     }, 180);
@@ -864,6 +874,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     const submitData = {
       mode: "automatic" as const,
       ...autoData,
+      paywayPaymentMethodId: detectedPaywayMethodId ?? undefined,
     };
 
     const result = await onSubmit(submitData);
@@ -934,6 +945,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     setGeneratedMobbexLink("");
     setCopyFeedback("");
     setDetectedCardBrand("");
+    setDetectedCardType(null);
+    setDetectedPaywayMethodId(null);
     setCashData({
       promoterId: localPromoters[0]?.id,
       promoterName: localPromoters[0]?.name ?? "",
@@ -1227,9 +1240,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {detectedCardBrand && (
-                      <p className="mt-2 text-xs font-semibold text-emerald-700">
-                        Marca detectada: {detectedCardBrand}
-                      </p>
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs font-semibold text-emerald-700">
+                          Marca detectada: {detectedCardBrand}
+                          {detectedCardType === "credit" && " · Crédito"}
+                          {detectedCardType === "debit" && " · Débito"}
+                          {detectedCardType === "prepaid" && " · Prepaga"}
+                        </p>
+                      </div>
                     )}
                   </div>
                   <div>

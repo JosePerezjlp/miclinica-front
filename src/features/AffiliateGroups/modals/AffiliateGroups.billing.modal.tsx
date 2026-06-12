@@ -2,6 +2,17 @@ import React from "react";
 import { X } from "lucide-react";
 import type { GroupDetailData } from "../AffiliateGroups.detail.types";
 
+const BILLING_STATUS_LABELS: Record<string, string> = {
+  PAID: "Pagado",
+  PENDING: "Pendiente",
+  IN_PROGRESS: "En proceso",
+  PARTIAL: "Parcial",
+  FAILED: "Fallido",
+  EXEMPT: "Eximido",
+};
+
+const statusLabel = (status: string) => BILLING_STATUS_LABELS[status] ?? status;
+
 interface BillingModalProps {
   groupData: GroupDetailData;
   onClose: () => void;
@@ -10,11 +21,13 @@ interface BillingModalProps {
 interface BillingContentProps {
   groupData: GroupDetailData;
   onPayRemaining?: (payment: UnifiedPaymentEntry) => void;
+  chargeLabel?: string;
+  chargingPeriodId?: number | null;
 }
 
 export type UnifiedPaymentEntry = {
   id: number;
-  source: "PAYMENT" | "MANUAL_PAYMENT";
+  source: "PAYMENT" | "MANUAL_PAYMENT" | "BILLING_PERIOD";
   billingPeriodId: number | null;
   amount: number;
   month: number;
@@ -38,6 +51,8 @@ const buildBillingPeriodKey = (month: number, year: number) =>
 export const BillingContent: React.FC<BillingContentProps> = ({
   groupData,
   onPayRemaining,
+  chargeLabel,
+  chargingPeriodId,
 }) => {
   const billingPeriodById = new Map(
     (groupData.billingPeriods || []).map((period) => [period.id, period]),
@@ -165,7 +180,47 @@ export const BillingContent: React.FC<BillingContentProps> = ({
           netAmountDue !== null ? Math.max(netAmountDue - periodPaid, 0) : null,
       };
     }),
-  ].sort((left, right) => {
+  ];
+
+  // Agregar billing periods PENDING/FAILED que no tienen ningún pago registrado
+  const coveredPeriodIds = new Set(
+    unifiedPayments
+      .map((p) => p.billingPeriodId)
+      .filter((id): id is number => id !== null),
+  );
+
+  for (const period of groupData.billingPeriods || []) {
+    if (period.status === "PAID" || period.status === "EXEMPT") continue;
+    if (coveredPeriodIds.has(period.id)) continue;
+
+    const amountDue = Number(period.amountDue || 0);
+    const discountAmount = discountsByPeriodKey.get(
+      buildBillingPeriodKey(period.month, period.year),
+    ) ?? 0;
+    const netAmountDue = Math.max(amountDue - discountAmount, 0);
+
+    unifiedPayments.push({
+      id: period.id,
+      source: "BILLING_PERIOD",
+      billingPeriodId: period.id,
+      amount: 0,
+      month: period.month,
+      year: period.year,
+      status: period.status,
+      channel: "—",
+      eventDate: period.dueDate,
+      createdAt: period.createdAt,
+      gatewayTransactionId: null,
+      reference: null,
+      notes: null,
+      amountDue,
+      discountAmount,
+      netAmountDue,
+      remainingAmount: netAmountDue,
+    });
+  }
+
+  unifiedPayments.sort((left, right) => {
     if (right.year !== left.year) return right.year - left.year;
     if (right.month !== left.month) return right.month - left.month;
     return (
@@ -271,10 +326,14 @@ export const BillingContent: React.FC<BillingContentProps> = ({
                       <td className="px-4 py-3 text-slate-600 text-xs font-semibold">
                         {payment.source === "MANUAL_PAYMENT"
                           ? "Manual"
-                          : "Automático"}
+                          : payment.source === "BILLING_PERIOD"
+                            ? "Sin cobrar"
+                            : "Automático"}
                       </td>
                       <td className="px-4 py-3 text-slate-600">
-                        ${payment.amount.toFixed(2)}
+                        {payment.source === "BILLING_PERIOD"
+                          ? <span className="text-amber-700 font-semibold">${(payment.amountDue ?? 0).toFixed(2)}</span>
+                          : `$${payment.amount.toFixed(2)}`}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -288,7 +347,7 @@ export const BillingContent: React.FC<BillingContentProps> = ({
                                   : "bg-slate-100 text-slate-700"
                           }`}
                         >
-                          {payment.status}
+                          {statusLabel(payment.status)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-600 text-xs font-mono">
@@ -299,21 +358,39 @@ export const BillingContent: React.FC<BillingContentProps> = ({
                           "es-AR",
                         )}
                       </td>
-                      {onPayRemaining && (
-                        <td className="px-4 py-3 text-slate-600 text-xs">
-                          {canPayRemaining ? (
-                            <button
-                              type="button"
-                              onClick={() => onPayRemaining(payment)}
-                              className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
-                            >
-                              Pagar
-                            </button>
-                          ) : (
-                            <span className="text-slate-400">-</span>
-                          )}
-                        </td>
-                      )}
+                      {onPayRemaining && (() => {
+                        const isThisCharging = chargingPeriodId !== null && chargingPeriodId === payment.billingPeriodId;
+                        const anyCharging = chargingPeriodId !== null;
+                        const label = chargeLabel ?? (payment.source === "BILLING_PERIOD" ? "Cobrar" : "Pagar");
+                        return (
+                          <td className="px-4 py-3 text-slate-600 text-xs">
+                            {canPayRemaining ? (
+                              <button
+                                type="button"
+                                disabled={anyCharging}
+                                onClick={() => !anyCharging && onPayRemaining(payment)}
+                                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors ${
+                                  isThisCharging
+                                    ? "bg-blue-400 cursor-wait"
+                                    : anyCharging
+                                      ? "bg-slate-300 cursor-not-allowed text-slate-500"
+                                      : "bg-blue-600 hover:bg-blue-700"
+                                }`}
+                              >
+                                {isThisCharging && (
+                                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                  </svg>
+                                )}
+                                {isThisCharging ? "Procesando..." : label}
+                              </button>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                        );
+                      })()}
                     </tr>
                   );
                 })
@@ -346,13 +423,15 @@ export const BillingContent: React.FC<BillingContentProps> = ({
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <p className="font-semibold text-slate-900">
-                      Pago #{payment.id} -{" "}
+                      {payment.source === "BILLING_PERIOD" ? "Cuota" : "Pago"} #{payment.id} -{" "}
                       {String(payment.month).padStart(2, "0")}/{payment.year}
                     </p>
                     <p className="text-xs text-slate-500">
                       {payment.source === "MANUAL_PAYMENT"
                         ? "Pago manual"
-                        : "Pago automático"}{" "}
+                        : payment.source === "BILLING_PERIOD"
+                          ? "Sin cobrar"
+                          : "Pago automático"}{" "}
                       •{" "}
                       {new Date(payment.eventDate).toLocaleDateString("es-AR")}
                     </p>

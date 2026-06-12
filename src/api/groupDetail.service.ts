@@ -122,8 +122,19 @@ export const runPaymentAttempt = async (
   groupId: number,
   payload: {
     amountDue?: number;
+    billingPeriodId?: number;
+    paymentMethodId?: number;
   },
-) => {
+): Promise<{
+  groupId: number;
+  billingPeriodId: number;
+  month: number;
+  year: number;
+  usedGateway: string;
+  usedMethodId: number;
+  amountDue: number;
+  execution: { success: boolean; attemptId: number; result: string };
+}> => {
   const { data } = await apiClient.post(
     `/groups/${groupId}/payment-attempts/run-now`,
     payload,

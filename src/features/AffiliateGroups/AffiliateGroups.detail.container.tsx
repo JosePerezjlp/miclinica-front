@@ -13,8 +13,10 @@ import {
 } from "lucide-react";
 import type { AppDispatch, RootState } from "../../store/store";
 import {
+  chargeNowForPeriodThunk,
   getGroupDetailThunk,
   registerManualPaymentThunk,
+  settleDebtByGatewayThunk,
   settleDebtThunk,
 } from "./AffiliateGroups.detail.action";
 import type { GroupDetailData } from "./AffiliateGroups.detail.types";
@@ -212,6 +214,15 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
     reference: "",
     notes: "",
   });
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<
+    number | null
+  >(null);
+  const [chargingPeriodId, setChargingPeriodId] = useState<number | null>(null);
+  const [chargeNowLoading, setChargeNowLoading] = useState(false);
+  const [chargeNowFeedback, setChargeNowFeedback] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
   const [showDebtSettlementModal, setShowDebtSettlementModal] = useState(false);
   const [debtSettlementForm, setDebtSettlementForm] = useState({
     amount: "",
@@ -373,6 +384,35 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
     });
   };
 
+  const handleChargeNow = async (payment: UnifiedPaymentEntry) => {
+    if (!payment.billingPeriodId || chargingPeriodId !== null) return;
+    setChargingPeriodId(payment.billingPeriodId);
+    setChargeNowLoading(true);
+    setChargeNowFeedback(null);
+    const result = await dispatch(
+      chargeNowForPeriodThunk({
+        groupId: parseInt(id, 10),
+        billingPeriodId: payment.billingPeriodId,
+      }),
+    );
+    setChargingPeriodId(null);
+    setChargeNowLoading(false);
+    if (chargeNowForPeriodThunk.fulfilled.match(result)) {
+      setChargeNowFeedback({
+        ok: true,
+        message: `Cobro de ${String(payment.month).padStart(2, "0")}/${payment.year} procesado correctamente.`,
+      });
+    } else {
+      setChargeNowFeedback({
+        ok: false,
+        message:
+          (result.payload as any)?.message ||
+          "Error al procesar el cobro. Revisá los logs del gateway.",
+      });
+    }
+    setTimeout(() => setChargeNowFeedback(null), 6000);
+  };
+
   const openDebtSettlementModal = () => {
     if (billingBalance <= 0) {
       return;
@@ -386,11 +426,13 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
       reference: "",
       notes: "Regularización de deuda acumulada",
     });
+    setSelectedPaymentMethodId(activeMethods[0]?.id ?? null);
     setShowDebtSettlementModal(true);
   };
 
   const closeDebtSettlementModal = () => {
     setShowDebtSettlementModal(false);
+    setSelectedPaymentMethodId(null);
   };
 
   const handleSubmitRemainingPayment = async (
@@ -417,6 +459,26 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
     ).unwrap();
 
     closeSettlePaymentModal();
+  };
+
+  const handleSubmitDebtSettlementByGateway = async () => {
+    if (!selectedPaymentMethodId) return;
+    const pendingPeriodIds = (groupData.billingPeriods || [])
+      .filter((p) => p.status !== "PAID" && p.status !== "EXEMPT")
+      .sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month)
+      .map((p) => p.id);
+    if (!pendingPeriodIds.length) return;
+
+    const result = await dispatch(
+      settleDebtByGatewayThunk({
+        groupId: groupData.id,
+        paymentMethodId: selectedPaymentMethodId,
+        billingPeriodIds: pendingPeriodIds,
+      }),
+    );
+    if (settleDebtByGatewayThunk.fulfilled.match(result)) {
+      closeDebtSettlementModal();
+    }
   };
 
   const handleSubmitDebtSettlement = async (
@@ -883,11 +945,22 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
             </p>
           </div>
 
+          {chargeNowFeedback && (
+            <div
+              className={`mb-4 rounded-lg px-4 py-3 text-sm font-semibold ${
+                chargeNowFeedback.ok
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-red-50 text-red-700 border border-red-200"
+              }`}
+            >
+              {chargeNowFeedback.message}
+            </div>
+          )}
           <BillingContent
             groupData={groupData}
-            onPayRemaining={
-              nextAutomaticMethod ? undefined : openSettlePaymentModal
-            }
+            onPayRemaining={nextAutomaticMethod ? handleChargeNow : openSettlePaymentModal}
+            chargeLabel={nextAutomaticMethod ? "Cobrar" : "Pagar"}
+            chargingPeriodId={chargingPeriodId}
           />
         </div>
       )}
@@ -1158,301 +1231,409 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
         </div>
       )}
 
-      {showDebtSettlementModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">
-                  Regularizar deuda acumulada
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Aplicá bonificación y definí cuánto cobrar ahora. La
-                  imputación se hace del período más viejo al más nuevo.
-                </p>
+      {showDebtSettlementModal && (() => {
+        const hasAutoMethods = activeMethods.length > 0;
+        const pendingPeriods = (groupData.billingPeriods || [])
+          .filter((p) => p.status !== "PAID" && p.status !== "EXEMPT")
+          .sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center p-0 sm:p-4">
+            <div className="w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl overflow-hidden">
+
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${hasAutoMethods ? "bg-blue-100" : "bg-amber-100"}`}>
+                    <span className="text-lg">{hasAutoMethods ? "💳" : "💵"}</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">
+                      Regularizar deuda
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {hasAutoMethods
+                        ? "Cobro automático — seleccioná el método y confirmá"
+                        : "Registrá el pago manual recibido"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDebtSettlementModal}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                >
+                  ✕
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={closeDebtSettlementModal}
-                className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-              >
-                Cerrar
-              </button>
-            </div>
 
-            <form
-              className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_360px]"
-              onSubmit={handleSubmitDebtSettlement}
-            >
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase text-slate-500">
-                      Deuda actual
-                    </p>
-                    <p className="mt-1 text-lg font-bold text-slate-900">
-                      ${billingBalance.toFixed(2)}
-                    </p>
+              {/* Body */}
+              <div className="overflow-y-auto flex-1">
+
+                {/* Resumen de deuda */}
+                <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
+                  <div className="px-6 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Deuda total</p>
+                    <p className="mt-1 text-2xl font-bold text-red-600">${billingBalance.toFixed(2)}</p>
+                    <p className="text-xs text-slate-400">{pendingPeriods.length} período{pendingPeriods.length !== 1 ? "s" : ""} pendiente{pendingPeriods.length !== 1 ? "s" : ""}</p>
                   </div>
-                  <div className="rounded-xl bg-blue-50 p-4">
-                    <p className="text-xs font-semibold uppercase text-blue-700">
-                      Total a regularizar
+                  <div className="px-6 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">A cobrar</p>
+                    <p className="mt-1 text-2xl font-bold text-blue-700">
+                      ${hasAutoMethods ? billingBalance.toFixed(2) : debtSettlementTotalToApply.toFixed(2)}
                     </p>
-                    <p className="mt-1 text-lg font-bold text-blue-900">
-                      ${debtSettlementTotalToApply.toFixed(2)}
-                    </p>
+                    <p className="text-xs text-slate-400">{hasAutoMethods ? "deuda completa" : "luego de bonificación"}</p>
                   </div>
-                  <div className="rounded-xl bg-amber-50 p-4">
-                    <p className="text-xs font-semibold uppercase text-amber-700">
-                      Saldo remanente
+                  <div className="px-6 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Saldo restante</p>
+                    <p className="mt-1 text-2xl font-bold text-emerald-700">
+                      ${hasAutoMethods ? "0.00" : debtSettlementRemainingBalance.toFixed(2)}
                     </p>
-                    <p className="mt-1 text-lg font-bold text-amber-900">
-                      ${debtSettlementRemainingBalance.toFixed(2)}
-                    </p>
+                    <p className="text-xs text-slate-400">proyectado luego del cobro</p>
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-900">
-                      Bonificación total
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      max={billingBalance}
-                      value={debtSettlementForm.discountAmount}
-                      onChange={(e) =>
-                        setDebtSettlementForm((current) => ({
-                          ...current,
-                          discountAmount: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+                <div className="grid gap-0 lg:grid-cols-[1fr_380px] divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
 
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-900">
-                      Monto a cobrar ahora
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      max={debtSettlementMaxPayable}
-                      value={debtSettlementForm.amount}
-                      onChange={(e) =>
-                        setDebtSettlementForm((current) => ({
-                          ...current,
-                          amount: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                    <p className="mt-1 text-xs text-slate-500">
-                      Máximo cobrable luego de bonificación: $
-                      {debtSettlementMaxPayable.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-
-                {debtSettlementDiscount > 0 && (
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-slate-900">
-                      Motivo bonificación
-                    </label>
-                    <input
-                      type="text"
-                      value={debtSettlementForm.discountReason}
-                      onChange={(e) =>
-                        setDebtSettlementForm((current) => ({
-                          ...current,
-                          discountReason: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Ej. Regularización comercial"
-                    />
-                  </div>
-                )}
-
-                {debtSettlementPaymentExceeded && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    El monto a cobrar supera el saldo que queda luego de aplicar
-                    la bonificación.
-                  </div>
-                )}
-
-                <div>
-                  <div className="mb-3 flex items-center justify-between">
-                    <h4 className="text-sm font-bold uppercase tracking-wide text-slate-700">
-                      Desglose por período
+                  {/* Panel izquierdo: períodos */}
+                  <div className="px-6 py-5 space-y-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                      Períodos a cobrar
                     </h4>
-                    <span className="text-xs text-slate-500">
-                      Vista previa de imputación
-                    </span>
-                  </div>
-
-                  {debtSettlementPreview.length > 0 ? (
-                    <div className="space-y-3">
-                      {debtSettlementPreview.map((item) => (
+                    <div className="space-y-2">
+                      {pendingPeriods.map((period) => (
                         <div
-                          key={item.billingPeriodId}
-                          className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                          key={period.id}
+                          className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
                         >
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <p className="text-sm font-bold text-slate-900">
-                                {item.periodLabel}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Vence {item.dueDate}
-                              </p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-slate-200 text-xs font-bold text-slate-600">
+                              {String(period.month).padStart(2, "0")}
                             </div>
-                            <div className="text-right text-xs text-slate-500">
-                              <p>
-                                Saldo actual: ${item.remainingAmount.toFixed(2)}
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">
+                                {String(period.month).padStart(2, "0")}/{period.year}
                               </p>
-                              <p>Cuota: ${item.amountDue.toFixed(2)}</p>
+                              <p className="text-xs text-slate-400">
+                                Vence {new Date(period.dueDate).toLocaleDateString("es-AR")}
+                              </p>
                             </div>
                           </div>
-
-                          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                            <div className="rounded-lg bg-white px-3 py-2">
-                              <p className="text-[11px] font-semibold uppercase text-slate-500">
-                                Bonificación
-                              </p>
-                              <p className="mt-1 font-semibold text-blue-700">
-                                ${item.discountApplied.toFixed(2)}
-                              </p>
-                            </div>
-                            <div className="rounded-lg bg-white px-3 py-2">
-                              <p className="text-[11px] font-semibold uppercase text-slate-500">
-                                Cobro
-                              </p>
-                              <p className="mt-1 font-semibold text-emerald-700">
-                                ${item.paymentApplied.toFixed(2)}
-                              </p>
-                            </div>
-                            <div className="rounded-lg bg-white px-3 py-2">
-                              <p className="text-[11px] font-semibold uppercase text-slate-500">
-                                Saldo proyectado
-                              </p>
-                              <p className="mt-1 font-semibold text-amber-700">
-                                ${item.projectedRemaining.toFixed(2)}
-                              </p>
-                            </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold text-slate-900">
+                              ${Number(period.amountDue || 0).toFixed(2)}
+                            </p>
+                            <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">
+                              {period.status}
+                            </span>
                           </div>
                         </div>
                       ))}
+                      {pendingPeriods.length === 0 && (
+                        <p className="text-sm text-slate-400 py-4 text-center">No hay períodos pendientes</p>
+                      )}
                     </div>
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
-                      Ingresá una bonificación o un monto a cobrar para ver cómo
-                      se va a imputar por período.
-                    </div>
-                  )}
+
+                    {/* Preview imputación (solo modo manual) */}
+                    {!hasAutoMethods && debtSettlementPreview.length > 0 && (
+                      <div className="space-y-2 pt-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                          Vista previa de imputación
+                        </h4>
+                        {debtSettlementPreview.map((item) => (
+                          <div key={item.billingPeriodId} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-bold text-slate-900">{item.periodLabel}</span>
+                              <span className="text-xs text-slate-400">Saldo: ${item.remainingAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div className="rounded-lg bg-blue-50 px-2 py-1.5 text-center">
+                                <p className="font-semibold text-blue-600">-${item.discountApplied.toFixed(2)}</p>
+                                <p className="text-slate-400 mt-0.5">Bonif.</p>
+                              </div>
+                              <div className="rounded-lg bg-emerald-50 px-2 py-1.5 text-center">
+                                <p className="font-semibold text-emerald-700">${item.paymentApplied.toFixed(2)}</p>
+                                <p className="text-slate-400 mt-0.5">Cobro</p>
+                              </div>
+                              <div className="rounded-lg bg-amber-50 px-2 py-1.5 text-center">
+                                <p className="font-semibold text-amber-700">${item.projectedRemaining.toFixed(2)}</p>
+                                <p className="text-slate-400 mt-0.5">Queda</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Panel derecho: acción */}
+                  <div className="px-6 py-5 space-y-5">
+
+                    {hasAutoMethods ? (
+                      /* MODO AUTOMÁTICO */
+                      <>
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">
+                            Cobrar con
+                          </h4>
+                          <div className="space-y-2">
+                            {activeMethods.map((method) => {
+                              const isSelected = selectedPaymentMethodId === method.id;
+                              const isCbu = method.type === "CBU";
+                              return (
+                                <button
+                                  key={method.id}
+                                  type="button"
+                                  onClick={() => setSelectedPaymentMethodId(method.id)}
+                                  className={`w-full flex items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                                    isSelected
+                                      ? "border-blue-500 bg-blue-50"
+                                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                                  }`}
+                                >
+                                  <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${isSelected ? "bg-blue-100" : "bg-slate-100"}`}>
+                                    <span className="text-lg">{isCbu ? "🏦" : "💳"}</span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-slate-900 truncate">
+                                      {isCbu
+                                        ? `CBU ${method.holderName || ""}`
+                                        : `${method.brand || method.gateway} •••• ${method.last4 || "****"}`}
+                                    </p>
+                                    <p className="text-xs text-slate-400 truncate">
+                                      {method.gateway}
+                                      {!isCbu && method.expiresAt
+                                        ? ` · Vence ${new Date(method.expiresAt).toLocaleDateString("es-AR", { month: "2-digit", year: "2-digit" })}`
+                                        : ""}
+                                      {!isCbu && method.holderName ? ` · ${method.holderName}` : ""}
+                                    </p>
+                                  </div>
+                                  {isSelected && (
+                                    <div className="h-5 w-5 flex-shrink-0 rounded-full bg-blue-500 flex items-center justify-center">
+                                      <span className="text-white text-xs font-bold">✓</span>
+                                    </div>
+                                  )}
+                                  {method.priority === 1 && !isSelected && (
+                                    <span className="flex-shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                                      Principal
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm">
+                          <div className="flex items-center justify-between text-slate-500">
+                            <span>Períodos a cobrar</span>
+                            <span>{pendingPeriods.length}</span>
+                          </div>
+                          <div className="mt-2 flex items-center justify-between font-bold text-slate-900 text-base">
+                            <span>Total a cobrar</span>
+                            <span className="text-blue-700">${billingBalance.toFixed(2)}</span>
+                          </div>
+                          <p className="mt-2 text-[11px] text-slate-400">
+                            Se realizará un intento de cobro por cada período pendiente, del más viejo al más nuevo.
+                          </p>
+                        </div>
+
+                        <div className="flex gap-3 pt-1">
+                          <button
+                            type="button"
+                            onClick={closeDebtSettlementModal}
+                            className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            disabled={loading || !selectedPaymentMethodId || pendingPeriods.length === 0}
+                            onClick={handleSubmitDebtSettlementByGateway}
+                            className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {loading ? "Procesando..." : `Cobrar $${billingBalance.toFixed(2)}`}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      /* MODO MANUAL */
+                      <form onSubmit={handleSubmitDebtSettlement} className="space-y-4">
+                        <div className="grid gap-4 grid-cols-2">
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                              Bonificación
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              max={billingBalance}
+                              value={debtSettlementForm.discountAmount}
+                              onChange={(e) =>
+                                setDebtSettlementForm((current) => ({
+                                  ...current,
+                                  discountAmount: e.target.value,
+                                }))
+                              }
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                              Monto a cobrar
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              max={debtSettlementMaxPayable}
+                              value={debtSettlementForm.amount}
+                              onChange={(e) =>
+                                setDebtSettlementForm((current) => ({
+                                  ...current,
+                                  amount: e.target.value,
+                                }))
+                              }
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              required
+                            />
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              Máx: ${debtSettlementMaxPayable.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {debtSettlementDiscount > 0 && (
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                              Motivo bonificación
+                            </label>
+                            <input
+                              type="text"
+                              value={debtSettlementForm.discountReason}
+                              onChange={(e) =>
+                                setDebtSettlementForm((current) => ({
+                                  ...current,
+                                  discountReason: e.target.value,
+                                }))
+                              }
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Ej. Regularización comercial"
+                            />
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                            Método de pago
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {(["CASH", "TRANSFER", "CARD"] as const).map((m) => (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setDebtSettlementForm((c) => ({ ...c, method: m }))}
+                                className={`rounded-xl border-2 px-3 py-2 text-xs font-bold transition-all ${
+                                  debtSettlementForm.method === m
+                                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                                    : "border-slate-200 text-slate-600 hover:border-slate-300"
+                                }`}
+                              >
+                                {m === "CASH" ? "Efectivo" : m === "TRANSFER" ? "Transferencia" : "Tarjeta"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                            Referencia <span className="text-slate-400 font-normal">(opcional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={debtSettlementForm.reference}
+                            onChange={(e) =>
+                              setDebtSettlementForm((current) => ({
+                                ...current,
+                                reference: e.target.value,
+                              }))
+                            }
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Comprobante, recibo…"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                            Notas <span className="text-slate-400 font-normal">(opcional)</span>
+                          </label>
+                          <textarea
+                            value={debtSettlementForm.notes}
+                            onChange={(e) =>
+                              setDebtSettlementForm((current) => ({
+                                ...current,
+                                notes: e.target.value,
+                              }))
+                            }
+                            rows={2}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                          />
+                        </div>
+
+                        {debtSettlementPaymentExceeded && (
+                          <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">
+                            El monto supera el saldo disponible luego de la bonificación.
+                          </div>
+                        )}
+
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm space-y-1.5">
+                          <div className="flex justify-between text-slate-500">
+                            <span>Bonificación</span>
+                            <span>-${debtSettlementDiscount.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-500">
+                            <span>Cobro ahora</span>
+                            <span>${debtSettlementPaymentAmount.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-slate-900 pt-1 border-t border-slate-200">
+                            <span>Saldo restante</span>
+                            <span className={debtSettlementRemainingBalance > 0 ? "text-amber-700" : "text-emerald-700"}>
+                              ${debtSettlementRemainingBalance.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3 pt-1">
+                          <button
+                            type="button"
+                            onClick={closeDebtSettlementModal}
+                            className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={
+                              loading ||
+                              debtSettlementPaymentExceeded ||
+                              debtSettlementTotalToApply <= 0
+                            }
+                            className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {loading ? "Guardando..." : "Registrar pago"}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-900">
-                    Método de pago
-                  </label>
-                  <select
-                    value={debtSettlementForm.method}
-                    onChange={(e) =>
-                      setDebtSettlementForm((current) => ({
-                        ...current,
-                        method: e.target.value as "CARD" | "CASH" | "TRANSFER",
-                      }))
-                    }
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="CASH">CASH</option>
-                    <option value="TRANSFER">TRANSFER</option>
-                    <option value="CARD">CARD</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-900">
-                    Referencia
-                  </label>
-                  <input
-                    type="text"
-                    value={debtSettlementForm.reference}
-                    onChange={(e) =>
-                      setDebtSettlementForm((current) => ({
-                        ...current,
-                        reference: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Comprobante, transferencia o recibo"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-900">
-                    Notas
-                  </label>
-                  <textarea
-                    value={debtSettlementForm.notes}
-                    onChange={(e) =>
-                      setDebtSettlementForm((current) => ({
-                        ...current,
-                        notes: e.target.value,
-                      }))
-                    }
-                    className="min-h-24 w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-                  <div className="flex items-center justify-between">
-                    <span>Bonificación</span>
-                    <span>${debtSettlementDiscount.toFixed(2)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span>Cobro ahora</span>
-                    <span>${debtSettlementPaymentAmount.toFixed(2)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between font-bold text-slate-900">
-                    <span>Saldo restante</span>
-                    <span>${debtSettlementRemainingBalance.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={closeDebtSettlementModal}
-                    className="flex-1 rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={
-                      loading ||
-                      debtSettlementPaymentExceeded ||
-                      debtSettlementTotalToApply <= 0
-                    }
-                    className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {loading ? "Guardando..." : "Regularizar deuda"}
-                  </button>
-                </div>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

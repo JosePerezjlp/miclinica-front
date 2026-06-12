@@ -47,6 +47,7 @@ export interface AutomaticAffiliateGroupFormData {
   lastName: string;
   dni: string;
   deviceFingerprintId: string;
+  paywayPaymentMethodId?: number;
 }
 
 export interface CashAffiliateGroupFormData {
@@ -228,6 +229,7 @@ export interface CreateGroupPaymentMethodRequest {
   postalCode?: string;
   phone?: string;
   deviceFingerprintId?: string;
+  paywayPaymentMethodId?: number;
 }
 
 export interface GroupPaymentMethodResponse {

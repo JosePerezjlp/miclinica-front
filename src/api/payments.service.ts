@@ -28,6 +28,9 @@ export interface RegisterSandboxCardInput {
 
 export interface CardBrandDetectionResponse {
   brand: string | null;
+  type: "credit" | "debit" | "prepaid" | null;
+  prepaid: boolean;
+  paywayPaymentMethodId: number | null;
 }
 
 export const paymentsService = {
