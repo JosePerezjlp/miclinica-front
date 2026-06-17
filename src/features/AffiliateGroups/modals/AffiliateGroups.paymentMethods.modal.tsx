@@ -118,41 +118,52 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
 
     const isSiro = formData.gateway === "SIRO";
 
-    await dispatch(
-      addPaymentMethodThunk({
-        groupId: groupData.id,
-        payload: {
-          gateway: formData.gateway,
-          type: isSiro ? "CBU" : "CARD",
-          rawToken: isSiro ? formData.rawToken : undefined,
-          priority: formData.priority,
-          cardNumber: isSiro ? undefined : formData.cardNumber,
-          cvv: isSiro ? undefined : formData.cvv,
-          expiryMonth: isSiro ? undefined : Number(formData.expiryMonth),
-          expiryYear: isSiro ? undefined : Number(formData.expiryYear),
-          last4: isSiro
-            ? formData.rawToken.replace(/\D/g, "").slice(-4)
-            : formData.cardNumber.replace(/\D/g, "").slice(-4),
-          brand: isSiro ? "CBU" : undefined,
-          holderName: formData.holderName || undefined,
-          documentNumber: formData.documentNumber || undefined,
-          email: isSiro ? formData.email || undefined : undefined,
-          address: undefined,
-          city: undefined,
-          province: undefined,
-          postalCode: undefined,
-          phone: undefined,
-          deviceFingerprintId:
-            formData.gateway === "PAYWAY"
-              ? getOrCreatePaywayDeviceFingerprintId()
+    try {
+      await dispatch(
+        addPaymentMethodThunk({
+          groupId: groupData.id,
+          payload: {
+            gateway: formData.gateway,
+            type: isSiro ? "CBU" : "CARD",
+            rawToken: isSiro ? formData.rawToken : undefined,
+            priority: formData.priority,
+            cardNumber: isSiro ? undefined : formData.cardNumber,
+            cvv: isSiro ? undefined : formData.cvv,
+            expiryMonth: isSiro ? undefined : Number(formData.expiryMonth),
+            expiryYear: isSiro ? undefined : Number(formData.expiryYear),
+            last4: isSiro
+              ? formData.rawToken.replace(/\D/g, "").slice(-4)
+              : formData.cardNumber.replace(/\D/g, "").slice(-4),
+            brand: isSiro ? "CBU" : undefined,
+            holderName: formData.holderName || undefined,
+            documentNumber: formData.documentNumber || undefined,
+            email: isSiro ? formData.email || undefined : undefined,
+            address: undefined,
+            city: undefined,
+            province: undefined,
+            postalCode: undefined,
+            phone: undefined,
+            deviceFingerprintId:
+              formData.gateway === "PAYWAY"
+                ? getOrCreatePaywayDeviceFingerprintId()
+                : undefined,
+            chargePendingNow: formData.chargePendingNow,
+            amountDue: formData.chargePendingNow
+              ? Number(formData.amountDue)
               : undefined,
-          chargePendingNow: formData.chargePendingNow,
-          amountDue: formData.chargePendingNow
-            ? Number(formData.amountDue)
-            : undefined,
-        },
-      }),
-    ).unwrap();
+          },
+        }),
+      ).unwrap();
+    } catch (error: any) {
+      toast.error(
+        error?.message ||
+          (isSiro
+            ? "No se pudo agregar el CBU. Verificá que sea un CBU bancario real (no un CVU de billetera digital)."
+            : "No se pudo agregar la tarjeta. Revisá los datos e intentá de nuevo."),
+        { duration: 6000 },
+      );
+      return;
+    }
 
     toast.success(
       isSiro
@@ -648,8 +659,20 @@ const PaymentMethodsModal: React.FC<PaymentMethodsModalProps> = ({
                   disabled={loading}
                   className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
-                  <Check className="w-4 h-4" />
-                  {loading ? "Guardando..." : "Agregar"}
+                  {loading ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Agregar
+                    </>
+                  )}
                 </button>
               </div>
             </form>

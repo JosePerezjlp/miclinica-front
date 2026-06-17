@@ -349,7 +349,7 @@ const GATEWAY_RESULT_LABELS: Record<string, string> = {
   FAILED_TOKEN_INVALID: "El token de la tarjeta expiró. Eliminá y volvé a agregar la forma de pago.",
   FAILED_GATEWAY_ERROR: "Error en el gateway de pago. Revisá los logs.",
   FAILED_GATEWAY_TIMEOUT: "Tiempo de espera agotado en el gateway.",
-  FAILED_CBU_INVALID: "CBU inválido.",
+  FAILED_CBU_INVALID: "CBU inválido o no tiene adhesión de Débito Directo vigente en SIRO. Verificá que sea un CBU bancario real (no un CVU de billetera digital).",
 };
 
 export const updatePlanThunk = createAsyncThunk<

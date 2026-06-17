@@ -180,6 +180,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const [cashError, setCashError] = useState("");
   const [autoError, setAutoError] = useState("");
   const [memberIdCounter, setMemberIdCounter] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [duplicateDniDialog, setDuplicateDniDialog] = useState<{
     context: "auto" | "member";
     dni: string;
@@ -870,23 +871,36 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
   const handleSubmitAuto = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAutoError("");
+    setIsSubmitting(true);
 
-    const submitData = {
-      mode: "automatic" as const,
-      ...autoData,
-      paywayPaymentMethodId: detectedPaywayMethodId ?? undefined,
-    };
+    try {
+      const submitData = {
+        mode: "automatic" as const,
+        ...autoData,
+        paywayPaymentMethodId: detectedPaywayMethodId ?? undefined,
+      };
 
-    const result = await onSubmit(submitData);
+      const result = await onSubmit(submitData);
 
-    if (autoData.gateway === "MOBBEX" && result?.mobbexSourceUrl) {
-      setGeneratedMobbexLink(result.mobbexSourceUrl);
-      setCopyFeedback("");
-      return;
+      if (autoData.gateway === "MOBBEX" && result?.mobbexSourceUrl) {
+        setGeneratedMobbexLink(result.mobbexSourceUrl);
+        setCopyFeedback("");
+        return;
+      }
+
+      resetForms();
+      onClose();
+    } catch (error: any) {
+      const msg =
+        error?.message ||
+        (autoData.gateway === "SIRO"
+          ? "No se pudo registrar el CBU. Verificá que sea un CBU bancario real (no un CVU de billetera digital)."
+          : "No se pudo crear el grupo. Revisá los datos e intentá de nuevo.");
+      setAutoError(msg);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    resetForms();
-    onClose();
   };
 
   const handleSubmitCash = async (e: React.FormEvent) => {
@@ -899,15 +913,22 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       return;
     }
 
-    const submitData = {
-      mode: "cash" as const,
-      ...cashData,
-      members,
-    };
+    setIsSubmitting(true);
+    try {
+      const submitData = {
+        mode: "cash" as const,
+        ...cashData,
+        members,
+      };
 
-    await onSubmit(submitData);
-    resetForms();
-    onClose();
+      await onSubmit(submitData);
+      resetForms();
+      onClose();
+    } catch (error: any) {
+      setCashError(error?.message || "No se pudo crear el grupo. Revisá los datos e intentá de nuevo.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -1371,16 +1392,27 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               <button
                 type="submit"
                 disabled={
-                  autoData.gateway === "MOBBEX" &&
-                  (isLoadingMobbexSubscriptions ||
-                    !autoData.mobbexSubscriptionId ||
-                    Boolean(generatedMobbexLink))
+                  isSubmitting ||
+                  (autoData.gateway === "MOBBEX" &&
+                    (isLoadingMobbexSubscriptions ||
+                      !autoData.mobbexSubscriptionId ||
+                      Boolean(generatedMobbexLink)))
                 }
-                className="flex-1 h-10 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-2 h-10 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
               >
-                {autoData.gateway === "MOBBEX"
-                  ? "GENERAR LINK DE MOBBEX"
-                  : "COBRAR"}
+                {isSubmitting ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Procesando...
+                  </>
+                ) : autoData.gateway === "MOBBEX" ? (
+                  "GENERAR LINK DE MOBBEX"
+                ) : (
+                  "COBRAR"
+                )}
               </button>
             </div>
           </form>
