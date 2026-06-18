@@ -14,6 +14,8 @@ import AffiliateGroupsDetailContainer from "./features/AffiliateGroups/Affiliate
 import AuditContainer from "./features/Audit/Audit.container";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAppSelector } from "./store/hooks";
+import AfiliadoSearch from "./features/Afiliado/AfiliadoSearch";
+import AfiliadoCard from "./features/Afiliado/AfiliadoCard";
 
 type RouteChildren = {
   children: ReactElement;
@@ -159,6 +161,8 @@ function App() {
           path="/auditoria"
           element={<Navigate to="/audit" replace />}
         />
+        <Route path="/afiliado" element={<AfiliadoSearch />} />
+        <Route path="/afiliado/:dni" element={<AfiliadoCard />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
