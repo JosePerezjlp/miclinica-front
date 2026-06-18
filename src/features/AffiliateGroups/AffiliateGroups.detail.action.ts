@@ -283,6 +283,75 @@ export const setPaymentAutomationThunk = createAsyncThunk<
   },
 );
 
+export const settleDebtByGatewayThunk = createAsyncThunk<
+  GroupDetailData,
+  { groupId: number; paymentMethodId: number; billingPeriodIds: number[] },
+  {
+    rejectValue: { message: string };
+  }
+>(
+  "groupDetail/settleDebtByGateway",
+  async ({ groupId, paymentMethodId, billingPeriodIds }, { rejectWithValue }) => {
+    try {
+      for (const billingPeriodId of billingPeriodIds) {
+        const attemptResult = await groupDetailService.runPaymentAttempt(groupId, {
+          billingPeriodId,
+          paymentMethodId,
+        });
+        if (!attemptResult.execution.success) {
+          const resultCode = attemptResult.execution.result ?? "FAILED";
+          const label = GATEWAY_RESULT_LABELS[resultCode] ?? `Cobro rechazado (${resultCode})`;
+          return rejectWithValue({ message: label });
+        }
+      }
+      return await groupDetailService.getGroupDetail(groupId);
+    } catch (error: any) {
+      return rejectWithValue({
+        message:
+          error?.response?.data?.message ||
+          "Error al procesar el cobro de la deuda",
+      });
+    }
+  },
+);
+
+export const chargeNowForPeriodThunk = createAsyncThunk<
+  GroupDetailData,
+  { groupId: number; billingPeriodId: number },
+  {
+    rejectValue: { message: string };
+  }
+>(
+  "groupDetail/chargeNowForPeriod",
+  async ({ groupId, billingPeriodId }, { rejectWithValue }) => {
+    try {
+      const attemptResult = await groupDetailService.runPaymentAttempt(groupId, { billingPeriodId });
+      const groupData = await groupDetailService.getGroupDetail(groupId);
+      if (!attemptResult.execution.success) {
+        const resultCode = attemptResult.execution.result ?? "FAILED";
+        const label = GATEWAY_RESULT_LABELS[resultCode] ?? `Cobro rechazado (${resultCode})`;
+        return rejectWithValue({ message: label });
+      }
+      return groupData;
+    } catch (error: any) {
+      return rejectWithValue({
+        message:
+          error?.response?.data?.message || "Error al intentar el cobro",
+      });
+    }
+  },
+);
+
+const GATEWAY_RESULT_LABELS: Record<string, string> = {
+  FAILED_INSUFFICIENT_FUNDS: "Fondos insuficientes en la tarjeta.",
+  FAILED_CARD_EXPIRED: "La tarjeta está vencida.",
+  FAILED_CARD_BLOCKED: "La tarjeta está bloqueada.",
+  FAILED_TOKEN_INVALID: "El token de la tarjeta expiró. Eliminá y volvé a agregar la forma de pago.",
+  FAILED_GATEWAY_ERROR: "Error en el gateway de pago. Revisá los logs.",
+  FAILED_GATEWAY_TIMEOUT: "Tiempo de espera agotado en el gateway.",
+  FAILED_CBU_INVALID: "CBU inválido o no tiene adhesión de Débito Directo vigente en SIRO. Verificá que sea un CBU bancario real (no un CVU de billetera digital).",
+};
+
 export const updatePlanThunk = createAsyncThunk<
   GroupDetailData,
   { groupId: number; payload: any },

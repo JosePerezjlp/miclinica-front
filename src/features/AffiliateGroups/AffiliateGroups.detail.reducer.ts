@@ -13,6 +13,8 @@ import {
   removePaymentMethodThunk,
   setPaymentAutomationThunk,
   updatePlanThunk,
+  chargeNowForPeriodThunk,
+  settleDebtByGatewayThunk,
 } from "./AffiliateGroups.detail.action";
 
 const initialState: GroupDetailState = {
@@ -201,6 +203,22 @@ const groupDetailSlice = createSlice({
       .addCase(updatePlanThunk.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message || "Error desconocido";
+      })
+
+      // Charge Now For Period (cobro manual desde tabla)
+      .addCase(chargeNowForPeriodThunk.fulfilled, (state, action) => {
+        state.data = action.payload;
+      })
+      .addCase(chargeNowForPeriodThunk.rejected, (state) => {
+        state.loading = false;
+      })
+
+      // Settle Debt By Gateway (cobro de deuda total por gateway)
+      .addCase(settleDebtByGatewayThunk.fulfilled, (state, action) => {
+        state.data = action.payload;
+      })
+      .addCase(settleDebtByGatewayThunk.rejected, (state) => {
+        state.loading = false;
       });
   },
 });

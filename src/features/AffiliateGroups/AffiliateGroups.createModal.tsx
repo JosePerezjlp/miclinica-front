@@ -152,6 +152,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const [generatedMobbexLink, setGeneratedMobbexLink] = useState("");
   const [copyFeedback, setCopyFeedback] = useState("");
   const [detectedCardBrand, setDetectedCardBrand] = useState("");
+  const [detectedCardType, setDetectedCardType] = useState<"credit" | "debit" | "prepaid" | null>(null);
+  const [detectedPaywayMethodId, setDetectedPaywayMethodId] = useState<number | null>(null);
 
   // Cash payment form
   const [cashData, setCashData] = useState<
@@ -178,6 +180,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const [cashError, setCashError] = useState("");
   const [autoError, setAutoError] = useState("");
   const [memberIdCounter, setMemberIdCounter] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [duplicateDniDialog, setDuplicateDniDialog] = useState<{
     context: "auto" | "member";
     dni: string;
@@ -550,6 +553,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   useEffect(() => {
     if (mode !== "automatic" || autoData.paymentMethod !== "card") {
       setDetectedCardBrand("");
+      setDetectedCardType(null);
+      setDetectedPaywayMethodId(null);
       return;
     }
 
@@ -557,6 +562,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
     if (digits.length < 4) {
       setDetectedCardBrand("");
+      setDetectedCardType(null);
+      setDetectedPaywayMethodId(null);
       return;
     }
 
@@ -569,10 +576,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
         if (!cancelled) {
           setDetectedCardBrand(response.brand ?? "");
+          setDetectedCardType(digits.length >= 6 ? response.type : null);
+          setDetectedPaywayMethodId(digits.length >= 6 ? response.paywayPaymentMethodId : null);
         }
       } catch {
         if (!cancelled) {
           setDetectedCardBrand("");
+          setDetectedCardType(null);
+          setDetectedPaywayMethodId(null);
         }
       }
     }, 180);
@@ -860,22 +871,36 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
   const handleSubmitAuto = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAutoError("");
+    setIsSubmitting(true);
 
-    const submitData = {
-      mode: "automatic" as const,
-      ...autoData,
-    };
+    try {
+      const submitData = {
+        mode: "automatic" as const,
+        ...autoData,
+        paywayPaymentMethodId: detectedPaywayMethodId ?? undefined,
+      };
 
-    const result = await onSubmit(submitData);
+      const result = await onSubmit(submitData);
 
-    if (autoData.gateway === "MOBBEX" && result?.mobbexSourceUrl) {
-      setGeneratedMobbexLink(result.mobbexSourceUrl);
-      setCopyFeedback("");
-      return;
+      if (autoData.gateway === "MOBBEX" && result?.mobbexSourceUrl) {
+        setGeneratedMobbexLink(result.mobbexSourceUrl);
+        setCopyFeedback("");
+        return;
+      }
+
+      resetForms();
+      onClose();
+    } catch (error: any) {
+      const msg =
+        error?.message ||
+        (autoData.gateway === "SIRO"
+          ? "No se pudo registrar el CBU. Verificá que sea un CBU bancario real (no un CVU de billetera digital)."
+          : "No se pudo crear el grupo. Revisá los datos e intentá de nuevo.");
+      setAutoError(msg);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    resetForms();
-    onClose();
   };
 
   const handleSubmitCash = async (e: React.FormEvent) => {
@@ -888,15 +913,22 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       return;
     }
 
-    const submitData = {
-      mode: "cash" as const,
-      ...cashData,
-      members,
-    };
+    setIsSubmitting(true);
+    try {
+      const submitData = {
+        mode: "cash" as const,
+        ...cashData,
+        members,
+      };
 
-    await onSubmit(submitData);
-    resetForms();
-    onClose();
+      await onSubmit(submitData);
+      resetForms();
+      onClose();
+    } catch (error: any) {
+      setCashError(error?.message || "No se pudo crear el grupo. Revisá los datos e intentá de nuevo.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -934,6 +966,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     setGeneratedMobbexLink("");
     setCopyFeedback("");
     setDetectedCardBrand("");
+    setDetectedCardType(null);
+    setDetectedPaywayMethodId(null);
     setCashData({
       promoterId: localPromoters[0]?.id,
       promoterName: localPromoters[0]?.name ?? "",
@@ -1227,9 +1261,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {detectedCardBrand && (
-                      <p className="mt-2 text-xs font-semibold text-emerald-700">
-                        Marca detectada: {detectedCardBrand}
-                      </p>
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs font-semibold text-emerald-700">
+                          Marca detectada: {detectedCardBrand}
+                          {detectedCardType === "credit" && " · Crédito"}
+                          {detectedCardType === "debit" && " · Débito"}
+                          {detectedCardType === "prepaid" && " · Prepaga"}
+                        </p>
+                      </div>
                     )}
                   </div>
                   <div>
@@ -1353,16 +1392,27 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               <button
                 type="submit"
                 disabled={
-                  autoData.gateway === "MOBBEX" &&
-                  (isLoadingMobbexSubscriptions ||
-                    !autoData.mobbexSubscriptionId ||
-                    Boolean(generatedMobbexLink))
+                  isSubmitting ||
+                  (autoData.gateway === "MOBBEX" &&
+                    (isLoadingMobbexSubscriptions ||
+                      !autoData.mobbexSubscriptionId ||
+                      Boolean(generatedMobbexLink)))
                 }
-                className="flex-1 h-10 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-2 h-10 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
               >
-                {autoData.gateway === "MOBBEX"
-                  ? "GENERAR LINK DE MOBBEX"
-                  : "COBRAR"}
+                {isSubmitting ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Procesando...
+                  </>
+                ) : autoData.gateway === "MOBBEX" ? (
+                  "GENERAR LINK DE MOBBEX"
+                ) : (
+                  "COBRAR"
+                )}
               </button>
             </div>
           </form>

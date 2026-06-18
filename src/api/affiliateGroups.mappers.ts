@@ -74,6 +74,7 @@ export function mapAutomaticFormToPaymentMethodRequest(input: {
   lastName: string;
   documentNumber?: string;
   deviceFingerprintId?: string;
+  paywayPaymentMethodId?: number;
 }): CreateGroupPaymentMethodRequest {
   if (input.gateway === "MOBBEX") {
     return {
@@ -121,6 +122,7 @@ export function mapAutomaticFormToPaymentMethodRequest(input: {
       ? toDigits(input.documentNumber)
       : undefined,
     deviceFingerprintId: input.deviceFingerprintId?.trim() || undefined,
+    paywayPaymentMethodId: input.paywayPaymentMethodId,
   };
 }
 
@@ -183,6 +185,7 @@ export function mapAutomaticFormToCreateGroupRequest(
       lastName: payload.lastName,
       documentNumber: payload.dni,
       deviceFingerprintId: payload.deviceFingerprintId,
+      paywayPaymentMethodId: payload.paywayPaymentMethodId,
     }),
   };
 }
