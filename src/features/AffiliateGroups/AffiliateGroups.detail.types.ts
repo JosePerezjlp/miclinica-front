@@ -69,6 +69,12 @@ export interface GroupDetailData {
     dueDate: string;
     amountDue: number;
     status: string;
+    attempts: Array<{
+      result: string;
+      failureCode: string | null;
+      failureMessage: string | null;
+      gateway: string;
+    }>;
   }>;
   payments: Array<{
     id: number;

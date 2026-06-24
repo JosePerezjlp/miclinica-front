@@ -21,8 +21,10 @@ interface BillingModalProps {
 interface BillingContentProps {
   groupData: GroupDetailData;
   onPayRemaining?: (payment: UnifiedPaymentEntry) => void;
+  onCheckStatus?: (payment: UnifiedPaymentEntry) => void;
   chargeLabel?: string;
   chargingPeriodId?: number | null;
+  checkingPeriodId?: number | null;
 }
 
 export type UnifiedPaymentEntry = {
@@ -43,6 +45,7 @@ export type UnifiedPaymentEntry = {
   discountAmount: number;
   netAmountDue: number | null;
   remainingAmount: number | null;
+  failureMessage: string | null;
 };
 
 const buildBillingPeriodKey = (month: number, year: number) =>
@@ -51,8 +54,10 @@ const buildBillingPeriodKey = (month: number, year: number) =>
 export const BillingContent: React.FC<BillingContentProps> = ({
   groupData,
   onPayRemaining,
+  onCheckStatus,
   chargeLabel,
   chargingPeriodId,
+  checkingPeriodId,
 }) => {
   const billingPeriodById = new Map(
     (groupData.billingPeriods || []).map((period) => [period.id, period]),
@@ -135,6 +140,7 @@ export const BillingContent: React.FC<BillingContentProps> = ({
         netAmountDue,
         remainingAmount:
           netAmountDue !== null ? Math.max(netAmountDue - periodPaid, 0) : null,
+        failureMessage: null,
       };
     }),
     ...(groupData.manualPayments || []).map((payment) => {
@@ -178,6 +184,7 @@ export const BillingContent: React.FC<BillingContentProps> = ({
         netAmountDue,
         remainingAmount:
           netAmountDue !== null ? Math.max(netAmountDue - periodPaid, 0) : null,
+        failureMessage: null,
       };
     }),
   ];
@@ -199,6 +206,7 @@ export const BillingContent: React.FC<BillingContentProps> = ({
     ) ?? 0;
     const netAmountDue = Math.max(amountDue - discountAmount, 0);
 
+    const lastAttempt = period.attempts?.[0] ?? null;
     unifiedPayments.push({
       id: period.id,
       source: "BILLING_PERIOD",
@@ -207,7 +215,7 @@ export const BillingContent: React.FC<BillingContentProps> = ({
       month: period.month,
       year: period.year,
       status: period.status,
-      channel: "—",
+      channel: lastAttempt?.gateway ?? "—",
       eventDate: period.dueDate,
       createdAt: period.createdAt,
       gatewayTransactionId: null,
@@ -217,6 +225,7 @@ export const BillingContent: React.FC<BillingContentProps> = ({
       discountAmount,
       netAmountDue,
       remainingAmount: netAmountDue,
+      failureMessage: lastAttempt?.failureMessage ?? null,
     });
   }
 
@@ -349,6 +358,11 @@ export const BillingContent: React.FC<BillingContentProps> = ({
                         >
                           {statusLabel(payment.status)}
                         </span>
+                        {payment.status === "FAILED" && payment.failureMessage && (
+                          <p className="mt-1 text-xs text-red-600 font-medium leading-tight max-w-[140px]">
+                            {payment.failureMessage}
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-slate-600 text-xs font-mono">
                         {payment.channel}
@@ -358,13 +372,44 @@ export const BillingContent: React.FC<BillingContentProps> = ({
                           "es-AR",
                         )}
                       </td>
-                      {onPayRemaining && (() => {
+                      {(onPayRemaining || onCheckStatus) && (() => {
+                        const isInProgress = payment.status === "IN_PROGRESS";
+                        const isThisChecking = checkingPeriodId !== null && checkingPeriodId === payment.billingPeriodId;
+                        const anyChecking = checkingPeriodId !== null;
                         const isThisCharging = chargingPeriodId !== null && chargingPeriodId === payment.billingPeriodId;
                         const anyCharging = chargingPeriodId !== null;
                         const label = chargeLabel ?? (payment.source === "BILLING_PERIOD" ? "Cobrar" : "Pagar");
+
+                        if (isInProgress && onCheckStatus && payment.billingPeriodId !== null) {
+                          return (
+                            <td className="px-4 py-3">
+                              <button
+                                type="button"
+                                disabled={anyChecking}
+                                onClick={() => !anyChecking && onCheckStatus(payment)}
+                                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                  isThisChecking
+                                    ? "bg-amber-400 text-white cursor-wait"
+                                    : anyChecking
+                                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                                      : "bg-amber-500 hover:bg-amber-600 text-white"
+                                }`}
+                              >
+                                {isThisChecking && (
+                                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                  </svg>
+                                )}
+                                {isThisChecking ? "Consultando..." : "Consultar"}
+                              </button>
+                            </td>
+                          );
+                        }
+
                         return (
                           <td className="px-4 py-3 text-slate-600 text-xs">
-                            {canPayRemaining ? (
+                            {canPayRemaining && onPayRemaining ? (
                               <button
                                 type="button"
                                 disabled={anyCharging}

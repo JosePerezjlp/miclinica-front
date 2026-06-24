@@ -14,6 +14,7 @@ import {
 import type { AppDispatch, RootState } from "../../store/store";
 import {
   chargeNowForPeriodThunk,
+  checkBillingPeriodSiroStatusThunk,
   getGroupDetailThunk,
   registerManualPaymentThunk,
   settleDebtByGatewayThunk,
@@ -218,10 +219,20 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
     number | null
   >(null);
   const [chargingPeriodId, setChargingPeriodId] = useState<number | null>(null);
-  const [chargeNowLoading, setChargeNowLoading] = useState(false);
   const [chargeNowFeedback, setChargeNowFeedback] = useState<{
     ok: boolean;
     message: string;
+  } | null>(null);
+  const [checkingPeriodId, setCheckingPeriodId] = useState<number | null>(null);
+  const [siroStatusModal, setSiroStatusModal] = useState<{
+    billingPeriodId: number;
+    billingPeriodStatus: string;
+    nroTransaccion?: string;
+    estado?: string;
+    estadoLabel?: string;
+    cantidadErrores?: number;
+    isError?: boolean;
+    message?: string;
   } | null>(null);
   const [showDebtSettlementModal, setShowDebtSettlementModal] = useState(false);
   const [debtSettlementForm, setDebtSettlementForm] = useState({
@@ -387,7 +398,6 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
   const handleChargeNow = async (payment: UnifiedPaymentEntry) => {
     if (!payment.billingPeriodId || chargingPeriodId !== null) return;
     setChargingPeriodId(payment.billingPeriodId);
-    setChargeNowLoading(true);
     setChargeNowFeedback(null);
     const result = await dispatch(
       chargeNowForPeriodThunk({
@@ -396,7 +406,6 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
       }),
     );
     setChargingPeriodId(null);
-    setChargeNowLoading(false);
     if (chargeNowForPeriodThunk.fulfilled.match(result)) {
       setChargeNowFeedback({
         ok: true,
@@ -411,6 +420,27 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
       });
     }
     setTimeout(() => setChargeNowFeedback(null), 6000);
+  };
+
+  const handleCheckStatus = async (payment: UnifiedPaymentEntry) => {
+    if (!payment.billingPeriodId || checkingPeriodId !== null) return;
+    setCheckingPeriodId(payment.billingPeriodId);
+    const result = await dispatch(
+      checkBillingPeriodSiroStatusThunk({
+        groupId: parseInt(id, 10),
+        billingPeriodId: payment.billingPeriodId,
+      }),
+    );
+    setCheckingPeriodId(null);
+    if (checkBillingPeriodSiroStatusThunk.fulfilled.match(result)) {
+      setSiroStatusModal(result.payload);
+    } else {
+      setSiroStatusModal({
+        billingPeriodId: payment.billingPeriodId ?? 0,
+        billingPeriodStatus: "ERROR",
+        message: (result.payload as any)?.message || "Error al consultar el estado SIRO.",
+      });
+    }
   };
 
   const openDebtSettlementModal = () => {
@@ -959,8 +989,10 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
           <BillingContent
             groupData={groupData}
             onPayRemaining={nextAutomaticMethod ? handleChargeNow : openSettlePaymentModal}
+            onCheckStatus={handleCheckStatus}
             chargeLabel={nextAutomaticMethod ? "Cobrar" : "Pagar"}
             chargingPeriodId={chargingPeriodId}
+            checkingPeriodId={checkingPeriodId}
           />
         </div>
       )}
@@ -1227,6 +1259,92 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {siroStatusModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${siroStatusModal.isError ? "bg-red-100" : "bg-amber-100"}`}>
+                  <span className="text-lg">{siroStatusModal.isError ? "❌" : "🔍"}</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Estado SIRO</h3>
+                  <p className="text-xs text-slate-500">
+                    {siroStatusModal.nroTransaccion ? `Transacción #${siroStatusModal.nroTransaccion}` : "Consulta de estado"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSiroStatusModal(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-6 py-6 space-y-4">
+              {siroStatusModal.message && !siroStatusModal.estado && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  {siroStatusModal.message}
+                </div>
+              )}
+
+              {siroStatusModal.estado && (
+                <>
+                  <div className={`rounded-xl border px-4 py-3 ${siroStatusModal.isError ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Estado</p>
+                    <p className={`text-base font-bold ${siroStatusModal.isError ? "text-red-700" : "text-amber-700"}`}>
+                      {siroStatusModal.estado}
+                    </p>
+                    {siroStatusModal.estadoLabel && (
+                      <p className="mt-1 text-sm text-slate-600">{siroStatusModal.estadoLabel}</p>
+                    )}
+                  </div>
+
+                  {typeof siroStatusModal.cantidadErrores === "number" && siroStatusModal.cantidadErrores > 0 && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-red-500 mb-1">Registros con error</p>
+                      <p className="text-lg font-bold text-red-700">{siroStatusModal.cantidadErrores}</p>
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Estado del período</p>
+                    <span className={`inline-block rounded-full px-3 py-1 text-xs font-bold ${
+                      siroStatusModal.billingPeriodStatus === "FAILED"
+                        ? "bg-red-100 text-red-700"
+                        : siroStatusModal.billingPeriodStatus === "IN_PROGRESS"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-emerald-100 text-emerald-700"
+                    }`}>
+                      {siroStatusModal.billingPeriodStatus === "IN_PROGRESS"
+                        ? "En proceso"
+                        : siroStatusModal.billingPeriodStatus === "FAILED"
+                          ? "Fallido"
+                          : siroStatusModal.billingPeriodStatus}
+                    </span>
+                    {siroStatusModal.billingPeriodStatus === "FAILED" && (
+                      <p className="mt-2 text-xs text-red-600">El período fue marcado como fallido por errores reportados por SIRO.</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="border-t border-slate-100 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setSiroStatusModal(null)}
+                className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
