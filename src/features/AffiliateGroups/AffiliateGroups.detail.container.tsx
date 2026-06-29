@@ -432,6 +432,7 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
       }),
     );
     setCheckingPeriodId(null);
+    dispatch(getGroupDetailThunk(parseInt(id, 10)));
     if (checkBillingPeriodSiroStatusThunk.fulfilled.match(result)) {
       setSiroStatusModal(result.payload);
     } else {

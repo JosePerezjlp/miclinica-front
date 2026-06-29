@@ -1375,7 +1375,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {autoError && (
-                  <p className="mt-2 text-sm text-rose-700">{autoError}</p>
+                  <div className="mt-2 text-sm text-rose-700">
+                    <p>{autoError}</p>
+                    {autoError.toUpperCase().includes("DENEGADA") && (
+                      <p className="mt-1 text-rose-500">
+                        Posibles motivos: tarjeta bloqueada, sin habilitación para pagos online, límite de crédito superado o restricción del banco emisor.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
