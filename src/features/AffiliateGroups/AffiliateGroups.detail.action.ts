@@ -352,6 +352,37 @@ const GATEWAY_RESULT_LABELS: Record<string, string> = {
   FAILED_CBU_INVALID: "CBU inválido o no tiene adhesión de Débito Directo vigente en SIRO. Verificá que sea un CBU bancario real (no un CVU de billetera digital).",
 };
 
+export const checkBillingPeriodSiroStatusThunk = createAsyncThunk<
+  {
+    billingPeriodId: number;
+    billingPeriodStatus: string;
+    nroTransaccion?: string;
+    estado?: string;
+    estadoLabel?: string;
+    cantidadErrores?: number;
+    isError?: boolean;
+    siroStatus?: Record<string, unknown> | null;
+    message?: string;
+    groupData?: GroupDetailData;
+  },
+  { groupId: number; billingPeriodId: number },
+  { rejectValue: { message: string } }
+>(
+  "groupDetail/checkBillingPeriodSiroStatus",
+  async ({ groupId, billingPeriodId }, { rejectWithValue }) => {
+    try {
+      const statusResult = await groupDetailService.checkSiroStatus(groupId, billingPeriodId);
+      const groupData = await groupDetailService.getGroupDetail(groupId);
+      return { ...statusResult, groupData };
+    } catch (error: any) {
+      return rejectWithValue({
+        message:
+          error?.response?.data?.message || "Error al consultar el estado SIRO",
+      });
+    }
+  },
+);
+
 export const updatePlanThunk = createAsyncThunk<
   GroupDetailData,
   { groupId: number; payload: any },

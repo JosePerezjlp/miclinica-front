@@ -163,6 +163,8 @@ export function mapAutomaticFormToCreateGroupRequest(
     holderFullName,
     planId: payload.planId,
     planName: payload.gateway === "MOBBEX" ? payload.plan : undefined,
+    promoterId: payload.promoterId,
+    cityId: payload.cityId ?? undefined,
     affiliates: [
       {
         firstName: holderFirstName,

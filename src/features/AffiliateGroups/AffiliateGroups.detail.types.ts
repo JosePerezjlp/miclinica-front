@@ -12,6 +12,8 @@ export interface GroupDetailData {
   gracePeriodEndsAt: string | null;
   rating: string;
   ratingUpdatedAt: string | null;
+  cityId: number | null;
+  city: { id: number; name: string } | null;
   promoter: {
     id: number;
     createdAt: string;
@@ -69,6 +71,12 @@ export interface GroupDetailData {
     dueDate: string;
     amountDue: number;
     status: string;
+    attempts: Array<{
+      result: string;
+      failureCode: string | null;
+      failureMessage: string | null;
+      gateway: string;
+    }>;
   }>;
   payments: Array<{
     id: number;
@@ -131,6 +139,8 @@ export interface UpdateGroupInfoPayload {
   holderFullName?: string;
   isActive?: boolean;
   chargeDay?: number;
+  promoterId?: number;
+  cityId?: number;
 }
 
 export interface AddAffiliatePayload {

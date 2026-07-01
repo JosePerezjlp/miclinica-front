@@ -35,6 +35,11 @@ export interface AutomaticAffiliateGroupFormData {
   gateway: PaymentGatewayProvider;
   plan: string;
   planId?: number;
+  promoterId?: number;
+  promoterName?: string;
+  seller?: string;
+  city?: string;
+  cityId?: number | null;
   mobbexSubscriptionId: string;
   mobbexWebhook?: string;
   paymentMethod: "card" | "cbu";
@@ -157,6 +162,7 @@ export interface FamiliarGroupsFilters {
   page?: number;
   pageSize?: number;
   dni?: string;
+  search?: string;
   paymentType?: "all" | "card" | "cbu" | "cash";
 }
 

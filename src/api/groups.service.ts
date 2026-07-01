@@ -22,6 +22,7 @@ export const familiarGroupGet = {
           page: filters.page ?? 1,
           pageSize: filters.pageSize ?? 10,
           dni: filters.dni?.trim() || undefined,
+          search: filters.search?.trim() || undefined,
           paymentType:
             filters.paymentType && filters.paymentType !== "all"
               ? filters.paymentType
