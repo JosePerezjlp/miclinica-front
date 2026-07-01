@@ -12,6 +12,8 @@ export interface GroupDetailData {
   gracePeriodEndsAt: string | null;
   rating: string;
   ratingUpdatedAt: string | null;
+  cityId: number | null;
+  city: { id: number; name: string } | null;
   promoter: {
     id: number;
     createdAt: string;
@@ -137,6 +139,8 @@ export interface UpdateGroupInfoPayload {
   holderFullName?: string;
   isActive?: boolean;
   chargeDay?: number;
+  promoterId?: number;
+  cityId?: number;
 }
 
 export interface AddAffiliatePayload {

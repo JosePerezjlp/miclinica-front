@@ -37,17 +37,19 @@ interface CreateAffiliateModalProps {
     | undefined;
 }
 
-const emptyCashMember: CashMember = {
-  id: 0,
-  firstName: "",
-  lastName: "",
-  birthDate: "",
-  dni: "",
-  address: "",
-  email: "",
-  phone: "",
-  inscriptionDate: "",
-};
+function makeEmptyCashMember(): CashMember {
+  return {
+    id: 0,
+    firstName: "",
+    lastName: "",
+    birthDate: "",
+    dni: "",
+    address: "",
+    email: "",
+    phone: "",
+    inscriptionDate: new Date().toISOString().slice(0, 10),
+  };
+}
 
 const PAYWAY_DEVICE_FINGERPRINT_STORAGE_KEY =
   "miclinica.payway.deviceFingerprintId";
@@ -124,6 +126,11 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     gateway: paymentGatewayOptions[0].value,
     plan: "",
     planId: undefined,
+    promoterId: undefined,
+    promoterName: "",
+    seller: "",
+    city: "",
+    cityId: null,
     mobbexSubscriptionId: "",
     mobbexWebhook: "",
     paymentMethod: "card",
@@ -173,7 +180,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   });
 
   const [members, setMembers] = useState<CashMember[]>([]);
-  const [memberDraft, setMemberDraft] = useState<CashMember>(emptyCashMember);
+  const [memberDraft, setMemberDraft] = useState<CashMember>(makeEmptyCashMember());
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
   const [memberFormError, setMemberFormError] = useState("");
@@ -200,6 +207,19 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     }
 
     setAutoData((prev) => {
+      if (name === "promoterId") {
+        const selectedPromoter = localPromoters.find(
+          (promoter) => promoter.id === Number(value),
+        );
+        return {
+          ...prev,
+          promoterId: selectedPromoter?.id,
+          promoterName: selectedPromoter?.name ?? prev.promoterName,
+          cityId: selectedPromoter?.cityId ?? null,
+          city: selectedPromoter?.city?.name ?? "",
+        };
+      }
+
       if (name === "gateway") {
         const gateway = value as PaymentGatewayProvider;
         const paymentMethod = gateway === "SIRO" ? "cbu" : "card";
@@ -380,16 +400,23 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
         const firstPromoter = activePromoters[0];
         if (firstPromoter) {
           setCashData((prev) => {
-            if (prev.promoterId) {
-              return prev;
-            }
-
+            if (prev.promoterId) return prev;
             return {
               ...prev,
               promoterId: firstPromoter.id,
               promoterName: firstPromoter.name,
               cityId: firstPromoter.cityId ?? null,
               city: firstPromoter.city?.name ?? cityOptions[0],
+            };
+          });
+          setAutoData((prev) => {
+            if (prev.promoterId) return prev;
+            return {
+              ...prev,
+              promoterId: firstPromoter.id,
+              promoterName: firstPromoter.name,
+              cityId: firstPromoter.cityId ?? null,
+              city: firstPromoter.city?.name ?? "",
             };
           });
         }
@@ -754,7 +781,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       setMemberDraft(member);
       setEditingMemberId(member.id);
     } else {
-      setMemberDraft(emptyCashMember);
+      setMemberDraft(makeEmptyCashMember());
       setEditingMemberId(null);
     }
 
@@ -764,7 +791,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const closeMemberForm = () => {
     setShowMemberForm(false);
     setEditingMemberId(null);
-    setMemberDraft(emptyCashMember);
+    setMemberDraft(makeEmptyCashMember());
     setMemberFormError("");
   };
 
@@ -947,6 +974,11 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       gateway: paymentGatewayOptions[0].value,
       plan: localPlans[0]?.name ?? "",
       planId: localPlans[0]?.id,
+      promoterId: localPromoters[0]?.id,
+      promoterName: localPromoters[0]?.name ?? "",
+      seller: "",
+      city: localPromoters[0]?.city?.name ?? "",
+      cityId: localPromoters[0]?.cityId ?? null,
       mobbexSubscriptionId: "",
       mobbexWebhook: "",
       paymentMethod: "card",
@@ -982,7 +1014,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       cityId: localPromoters[0]?.cityId ?? null,
     });
     setMembers([]);
-    setMemberDraft(emptyCashMember);
+    setMemberDraft(makeEmptyCashMember());
     setShowMemberForm(false);
     setMemberFormError("");
     setCashError("");
@@ -1104,7 +1136,78 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
             onSubmit={handleSubmitAuto}
             className="px-6 py-6 space-y-6"
           >
-            {/* Card type selection */}
+            {/* Promotor, Vendedor */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Promotor
+                </label>
+                <select
+                  name="promoterId"
+                  value={autoData.promoterId ? String(autoData.promoterId) : ""}
+                  onChange={handleAutoChange}
+                  disabled={isLoadingPromoters || localPromoters.length === 0}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {isLoadingPromoters && (
+                    <option value="">Cargando promotores...</option>
+                  )}
+                  {!isLoadingPromoters && localPromoters.length === 0 && (
+                    <option value="">No hay promotores activos</option>
+                  )}
+                  {localPromoters.map((promoter) => (
+                    <option key={promoter.id} value={String(promoter.id)}>
+                      {promoter.name}
+                    </option>
+                  ))}
+                </select>
+                {promotersError && (
+                  <p className="mt-2 text-xs text-amber-700">{promotersError}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Vendedor (opcional)
+                </label>
+                <select
+                  name="seller"
+                  value={autoData.seller ?? ""}
+                  onChange={handleAutoChange}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Sin vendedor (La clinica)</option>
+                  {sellerOptions.map((seller) => (
+                    <option key={seller} value={seller}>
+                      {seller}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Ciudad */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Ciudad (del promotor)
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={autoData.city || "Sin ciudad asignada"}
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-600 cursor-not-allowed"
+              />
+              {autoData.cityId && (
+                <p className="mt-1 text-xs text-slate-500">
+                  Ciudad asignada al promotor seleccionado
+                </p>
+              )}
+              {!autoData.cityId && autoData.promoterId && (
+                <p className="mt-1 text-xs text-amber-600">
+                  El promotor seleccionado no tiene ciudad asignada
+                </p>
+              )}
+            </div>
+
             {/* Gateway and plan */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1762,13 +1865,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       <input
                         type="date"
                         value={memberDraft.inscriptionDate}
-                        onChange={(e) =>
-                          handleMemberDraftChange(
-                            "inscriptionDate",
-                            e.target.value,
-                          )
-                        }
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        readOnly
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed"
                       />
                     </div>
                   </div>

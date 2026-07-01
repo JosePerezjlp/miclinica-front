@@ -340,7 +340,7 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
     : "Sin precio";
   const nextChargeDate = calculateNextChargeDate(groupData.chargeDay);
   const promoterName = groupData.promoter?.name?.trim() || "Sin promotor";
-  const cityLabel = "No informada";
+  const cityLabel = groupData.city?.name?.trim() || "No informada";
   const debtSettlementDiscount = Math.max(
     0,
     Number(debtSettlementForm.discountAmount || 0),

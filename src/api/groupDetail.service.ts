@@ -35,6 +35,8 @@ export const updateGroupInfo = async (
     holderFullName?: string;
     isActive?: boolean;
     chargeDay?: number;
+    promoterId?: number;
+    cityId?: number;
   },
 ): Promise<GroupDetailData> => {
   const { data } = await apiClient.patch(`/groups/${groupId}`, payload);

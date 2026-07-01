@@ -88,7 +88,7 @@ const AffiliateGroupsContainer: React.FC = () => {
     (state: RootState) => state.affiliateGroups,
   );
 
-  const [dni, setDni] = useState("");
+  const [search, setSearch] = useState("");
   const [showGroups, setShowGroups] = useState(true);
   const [paymentFilter, setPaymentFilter] = useState<
     "all" | "card" | "cbu" | "cash"
@@ -97,7 +97,7 @@ const AffiliateGroupsContainer: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const handleClear = () => {
-    setDni("");
+    setSearch("");
     setPaymentFilter("all");
     setPage(1);
   };
@@ -115,7 +115,7 @@ const AffiliateGroupsContainer: React.FC = () => {
         getGroupsThunk({
           page: 1,
           pageSize: meta.pageSize,
-          dni,
+          search,
           paymentType: paymentFilter,
         }),
       );
@@ -133,15 +133,15 @@ const AffiliateGroupsContainer: React.FC = () => {
       getGroupsThunk({
         page,
         pageSize: meta.pageSize,
-        dni,
+        search,
         paymentType: paymentFilter,
       }),
     );
-  }, [dispatch, page, meta.pageSize, dni, paymentFilter]);
+  }, [dispatch, page, meta.pageSize, search, paymentFilter]);
 
   useEffect(() => {
     setPage(1);
-  }, [dni, paymentFilter]);
+  }, [search, paymentFilter]);
 
   return (
     <div className="w-full px-6 py-6 space-y-5">
@@ -203,10 +203,10 @@ const AffiliateGroupsContainer: React.FC = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Buscar por DNI"
-                value={dni}
-                onChange={(e) => setDni(e.target.value)}
-                className="h-9 pl-9 pr-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Nombre, email, teléfono o DNI"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 pl-9 pr-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
               />
             </div>
 
