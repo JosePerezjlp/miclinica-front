@@ -28,6 +28,7 @@ export interface CashMember {
   email: string;
   phone: string;
   inscriptionDate: string;
+  existingGroupId?: number;
 }
 
 export interface AutomaticAffiliateGroupFormData {

@@ -77,7 +77,7 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
     setEditData({
       firstName: affiliate.firstName ?? '',
       lastName: affiliate.lastName ?? '',
-      documentNumber: affiliate.documentNumber ?? '',
+      documentNumber: String(affiliate.documentNumber ?? ''),
       birthDate: affiliate.birthDate ? affiliate.birthDate.slice(0, 10) : '',
       address: affiliate.address ?? '',
       email: affiliate.email ?? '',

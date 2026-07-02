@@ -184,16 +184,14 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
   const [memberFormError, setMemberFormError] = useState("");
+  const [memberDraftMatchedAffiliate, setMemberDraftMatchedAffiliate] =
+    useState<AffiliateResponse | null>(null);
   const [cashError, setCashError] = useState("");
   const [autoError, setAutoError] = useState("");
   const [memberIdCounter, setMemberIdCounter] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [duplicateDniDialog, setDuplicateDniDialog] = useState<{
-    context: "auto" | "member";
-    dni: string;
-    affiliate: AffiliateResponse;
-  } | null>(null);
-  const duplicateDniResolver = useRef<((value: boolean) => void) | null>(null);
+  const [autoDniMatchedAffiliate, setAutoDniMatchedAffiliate] =
+    useState<AffiliateResponse | null>(null);
   const autoFormRef = useRef<HTMLFormElement | null>(null);
   const cashFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -204,6 +202,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
     if (name === "dni") {
       setAutoError("");
+      setAutoDniMatchedAffiliate(null);
     }
 
     setAutoData((prev) => {
@@ -625,6 +624,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     setMemberDraft((prev) => ({ ...prev, [field]: value }));
     if (field === "dni") {
       setMemberFormError("");
+      setMemberDraftMatchedAffiliate(null);
     }
   };
 
@@ -646,132 +646,64 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     return `${year}-${month}-${day}`;
   };
 
-  const confirmExistingAffiliateWithDni = async (
-    dni: string,
-    context: "auto" | "member",
-  ) => {
+  const confirmExistingAffiliateWithDni = async (dni: string): Promise<boolean> => {
     const normalizedDni = normalizeDni(dni);
-    if (!normalizedDni) {
-      return true;
-    }
-
+    if (!normalizedDni) return true;
     try {
-      const existingAffiliates =
-        await affiliatesService.findByDocumentNumber(normalizedDni);
-
-      if (existingAffiliates.length === 0) {
-        return true;
-      }
-
-      const [affiliate] = existingAffiliates;
-      return new Promise<boolean>((resolve) => {
-        duplicateDniResolver.current = resolve;
-        setDuplicateDniDialog({
-          context,
-          dni: normalizedDni,
-          affiliate,
-        });
-      });
-    } catch (error) {
-      console.error("Error verificando afiliado existente:", error);
+      const existing = await affiliatesService.findByDocumentNumber(normalizedDni);
+      return existing.length === 0;
+    } catch {
       return true;
     }
-  };
-
-  const closeDuplicateDniDialog = () => {
-    setDuplicateDniDialog(null);
-    duplicateDniResolver.current = null;
-  };
-
-  const handleConfirmDuplicateDni = async () => {
-    if (duplicateDniDialog) {
-      const affiliate = duplicateDniDialog.affiliate;
-      const context = duplicateDniDialog.context;
-
-      await affiliatesService.removeById(affiliate.id);
-
-      if (context === "auto") {
-        setAutoData((prev) => ({
-          ...prev,
-          firstName: affiliate.firstName,
-          lastName: affiliate.lastName,
-          dni: affiliate.documentNumber,
-        }));
-        setAutoError("");
-      } else {
-        setMemberDraft((prev) => ({
-          ...prev,
-          firstName: affiliate.firstName,
-          lastName: affiliate.lastName,
-          birthDate: formatDateForInput(affiliate.birthDate) || prev.birthDate,
-          dni: affiliate.documentNumber,
-          address: affiliate.address || "",
-          email: affiliate.email || "",
-          phone: affiliate.phone || "",
-        }));
-        setMemberFormError("");
-      }
-
-      duplicateDniResolver.current?.(true);
-      closeDuplicateDniDialog();
-
-      setTimeout(() => {
-        const form =
-          context === "auto" ? autoFormRef.current : cashFormRef.current;
-
-        if (form) {
-          form.dispatchEvent(
-            new Event("submit", { bubbles: true, cancelable: true }),
-          );
-        }
-      }, 100);
-    } else {
-      duplicateDniResolver.current?.(true);
-      closeDuplicateDniDialog();
-    }
-  };
-
-  const handleCancelDuplicateDni = () => {
-    duplicateDniResolver.current?.(false);
-    if (duplicateDniDialog?.context === "auto") {
-      setAutoError("El DNI ya existe en otro afiliado.");
-      setAutoData((prev) => ({ ...prev, dni: "" }));
-    } else {
-      setMemberFormError("El DNI ya existe en otro afiliado.");
-    }
-    closeDuplicateDniDialog();
   };
 
   const handleAutoDniBlur = async () => {
-    if (!autoData.dni.trim()) {
-      return;
+    const normalized = normalizeDni(autoData.dni);
+    if (!normalized) return;
+    try {
+      const existing = await affiliatesService.findByDocumentNumber(normalized);
+      if (existing.length === 0) {
+        setAutoDniMatchedAffiliate(null);
+        return;
+      }
+      const [affiliate] = existing;
+      setAutoDniMatchedAffiliate(affiliate);
+      setAutoData((prev) => ({
+        ...prev,
+        firstName: affiliate.firstName,
+        lastName: affiliate.lastName,
+      }));
+      setAutoError("");
+    } catch {
+      setAutoDniMatchedAffiliate(null);
     }
-
-    const confirmed = await confirmExistingAffiliateWithDni(
-      autoData.dni,
-      "auto",
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    setAutoError("");
   };
 
   const handleMemberDniBlur = async () => {
-    if (!memberDraft.dni.trim()) {
-      return;
-    }
+    const normalized = normalizeDni(memberDraft.dni);
+    if (!normalized) return;
 
-    const confirmed = await confirmExistingAffiliateWithDni(
-      memberDraft.dni,
-      "member",
-    );
-    if (!confirmed) {
-      return;
+    try {
+      const existing = await affiliatesService.findByDocumentNumber(normalized);
+      if (existing.length === 0) {
+        setMemberDraftMatchedAffiliate(null);
+        return;
+      }
+      const [affiliate] = existing;
+      setMemberDraftMatchedAffiliate(affiliate);
+      setMemberDraft((prev) => ({
+        ...prev,
+        firstName: affiliate.firstName,
+        lastName: affiliate.lastName,
+        birthDate: formatDateForInput(affiliate.birthDate),
+        address: affiliate.address ?? "",
+        email: affiliate.email ?? "",
+        phone: affiliate.phone ?? "",
+      }));
+      setMemberFormError("");
+    } catch {
+      setMemberDraftMatchedAffiliate(null);
     }
-
-    setMemberFormError("");
   };
 
   const openMemberForm = (member?: CashMember) => {
@@ -793,6 +725,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     setEditingMemberId(null);
     setMemberDraft(makeEmptyCashMember());
     setMemberFormError("");
+    setMemberDraftMatchedAffiliate(null);
   };
 
   const normalizeDni = (dni: string) => dni.replace(/\D/g, "");
@@ -816,9 +749,15 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       return;
     }
 
-    const confirmed = await confirmExistingAffiliateWithDni(dniValue, "member");
-    if (!confirmed) {
-      return;
+    // Si el DNI ya existe y no estamos en modo "continuar igualmente", informar
+    if (!memberDraftMatchedAffiliate) {
+      const isNew = await confirmExistingAffiliateWithDni(dniValue);
+      if (!isNew) {
+        setMemberFormError(
+          "Este DNI ya está registrado. Completá el campo DNI y esperá que se carguen los datos para continuar.",
+        );
+        return;
+      }
     }
 
     const duplicate = members.some(
@@ -852,7 +791,29 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
         ),
       );
     } else {
-      setMembers((prev) => [...prev, { ...newMember, id: memberIdCounter }]);
+      // Si el DNI corresponde a un afiliado existente y se editaron datos, actualizarlo
+      if (memberDraftMatchedAffiliate) {
+        const a = memberDraftMatchedAffiliate;
+        const changes: Record<string, string> = {};
+        if (firstName !== a.firstName) changes.firstName = firstName;
+        if (lastName !== a.lastName) changes.lastName = lastName;
+        if (newMember.address !== (a.address ?? "")) changes.address = newMember.address;
+        if (newMember.email !== (a.email ?? "")) changes.email = newMember.email;
+        if (newMember.phone !== (a.phone ?? "")) changes.phone = newMember.phone;
+        if (Object.keys(changes).length > 0) {
+          affiliatesService
+            .update(a.familiarGroupId, a.id, changes as any)
+            .catch(() => {});
+        }
+      }
+      setMembers((prev) => [
+        ...prev,
+        {
+          ...newMember,
+          id: memberIdCounter,
+          existingGroupId: memberDraftMatchedAffiliate?.familiarGroupId,
+        },
+      ]);
       setMemberIdCounter((prev) => prev + 1);
     }
 
@@ -1000,6 +961,8 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     setDetectedCardBrand("");
     setDetectedCardType(null);
     setDetectedPaywayMethodId(null);
+    setAutoDniMatchedAffiliate(null);
+    setMemberDraftMatchedAffiliate(null);
     setCashData({
       promoterId: localPromoters[0]?.id,
       promoterName: localPromoters[0]?.name ?? "",
@@ -1097,37 +1060,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
           </div>
         </div>
 
-        {duplicateDniDialog && (
-          <div className="px-6 py-4 border-b border-slate-100 bg-amber-50">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-              <p className="text-sm font-semibold text-amber-900 mb-2">
-                Afiliado existente encontrado
-              </p>
-              <p className="text-sm text-amber-700">
-                Ya existe un afiliado con DNI {duplicateDniDialog.dni}:{" "}
-                {duplicateDniDialog.affiliate.firstName}{" "}
-                {duplicateDniDialog.affiliate.lastName}. Está asociado al grupo
-                #{duplicateDniDialog.affiliate.familiarGroupId}.
-              </p>
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={handleCancelDuplicateDni}
-                  className="h-10 w-full sm:w-auto border border-amber-300 text-amber-900 bg-white hover:bg-amber-100 rounded-xl font-semibold transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmDuplicateDni}
-                  className="h-10 w-10 sm:w-auto bg-amber-900 hover:bg-amber-800 text-white rounded-xl font-semibold transition-colors"
-                >
-                  Continuar igualmente
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Automatic Payment Form */}
         {mode === "automatic" && (
@@ -1490,6 +1422,19 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
               </div>
             </div>
 
+            {autoDniMatchedAffiliate && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                <p className="font-semibold">
+                  DNI ya registrado — Grupo #{autoDniMatchedAffiliate.familiarGroupId}
+                </p>
+                <p>
+                  {autoDniMatchedAffiliate.firstName}{" "}
+                  {autoDniMatchedAffiliate.lastName}. Los datos fueron completados
+                  automáticamente. Podés editarlos antes de continuar.
+                </p>
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="flex gap-3 pt-4 border-t border-slate-200">
               <button
@@ -1717,12 +1662,24 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
             )}
 
             <div className="border-t border-slate-200 pt-6">
+              {memberDraftMatchedAffiliate && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 mb-4">
+                  <p className="font-semibold">
+                    DNI ya registrado — Grupo #{memberDraftMatchedAffiliate.familiarGroupId}
+                  </p>
+                  <p>
+                    {memberDraftMatchedAffiliate.firstName}{" "}
+                    {memberDraftMatchedAffiliate.lastName}. Los datos fueron
+                    completados automáticamente. Podés editarlos antes de continuar.
+                  </p>
+                </div>
+              )}
               <div className="mb-4">
                 <button
                   type="submit"
                   className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-colors"
                 >
-                  CREAR AFILIADO
+                  CREAR GRUPO FAMILIAR
                 </button>
               </div>
               {!showMemberForm && (
@@ -1761,6 +1718,37 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                     El primer miembro siempre es el titular. Puedes editar al
                     titular desde la lista.
                   </p>
+                  {/* DNI primero */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        DNI
+                      </label>
+                      <input
+                        type="text"
+                        value={memberDraft.dni}
+                        onChange={(e) =>
+                          handleMemberDraftChange("dni", e.target.value)
+                        }
+                        onBlur={handleMemberDniBlur}
+                        placeholder="Ingresá el DNI"
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Fecha de Nacimiento
+                      </label>
+                      <input
+                        type="date"
+                        value={memberDraft.birthDate}
+                        onChange={(e) =>
+                          handleMemberDraftChange("birthDate", e.target.value)
+                        }
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -1785,35 +1773,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                         onChange={(e) =>
                           handleMemberDraftChange("lastName", e.target.value)
                         }
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Fecha de Nacimiento
-                      </label>
-                      <input
-                        type="date"
-                        value={memberDraft.birthDate}
-                        onChange={(e) =>
-                          handleMemberDraftChange("birthDate", e.target.value)
-                        }
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        DNI
-                      </label>
-                      <input
-                        type="text"
-                        value={memberDraft.dni}
-                        onChange={(e) =>
-                          handleMemberDraftChange("dni", e.target.value)
-                        }
-                        onBlur={handleMemberDniBlur}
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
@@ -1883,7 +1842,11 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       onClick={saveMember}
                       className="flex-1 h-10 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors"
                     >
-                      {editingMemberId ? "GUARDAR MIEMBRO" : "AGREGAR MIEMBRO"}
+                      {memberDraftMatchedAffiliate
+                        ? "CONTINUAR IGUALMENTE"
+                        : editingMemberId
+                          ? "GUARDAR MIEMBRO"
+                          : "AGREGAR MIEMBRO"}
                     </button>
                   </div>
                 </div>
@@ -1897,6 +1860,12 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                     key={member.id}
                     className="bg-slate-50 p-6 rounded-xl border border-slate-200"
                   >
+                    {member.existingGroupId && (
+                      <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 mb-3">
+                        <span className="font-semibold">⚠ Este afiliado ya pertenece al Grupo #{member.existingGroupId}.</span>{" "}
+                        Al crear el grupo familiar será dado de baja del grupo anterior y pasará a este nuevo grupo.
+                      </div>
+                    )}
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
                       <div>
                         <h3 className="text-lg font-bold text-slate-900">
