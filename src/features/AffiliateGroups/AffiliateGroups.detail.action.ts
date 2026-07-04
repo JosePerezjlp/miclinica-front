@@ -94,6 +94,33 @@ export const registerManualPaymentThunk = createAsyncThunk<
   },
 );
 
+export const updateManualPaymentThunk = createAsyncThunk<
+  GroupDetailData,
+  {
+    groupId: number;
+    paymentId: number;
+    payload: {
+      amount?: number;
+      paidAt?: string;
+      reference?: string;
+      notes?: string;
+    };
+  },
+  { rejectValue: { message: string } }
+>(
+  "groupDetail/updateManualPayment",
+  async ({ groupId, paymentId, payload }, { rejectWithValue }) => {
+    try {
+      return await groupDetailService.updateManualPayment(groupId, paymentId, payload);
+    } catch (error: any) {
+      return rejectWithValue({
+        message:
+          error?.response?.data?.message || "Error al actualizar el pago",
+      });
+    }
+  },
+);
+
 export const settleDebtThunk = createAsyncThunk<
   GroupDetailData,
   {

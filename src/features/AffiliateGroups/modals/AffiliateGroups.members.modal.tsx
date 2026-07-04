@@ -29,28 +29,47 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
   });
 
   const [editData, setEditData] = useState<any>(null);
+  const [editError, setEditError] = useState('');
+  const [addError, setAddError] = useState('');
+
+  const sanitizePayload = (data: any) => ({
+    ...data,
+    phone: data.phone != null ? String(data.phone) : '',
+    address: data.address != null ? String(data.address) : '',
+    email: data.email != null ? String(data.email) : '',
+    documentNumber: data.documentNumber != null ? String(data.documentNumber) : undefined,
+  });
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    await dispatch(addAffiliateThunk({
+    setAddError('');
+    const result = await dispatch(addAffiliateThunk({
       groupId: groupData.id,
-      payload: formData,
+      payload: sanitizePayload(formData),
     }));
+    if (addAffiliateThunk.rejected.match(result)) {
+      setAddError((result.payload as any)?.message || 'Error al agregar el miembro.');
+      return;
+    }
     setFormData({ firstName: '', lastName: '', documentNumber: '', birthDate: '', address: '', email: '', phone: '', isHolder: false });
     setShowAddForm(false);
   };
 
   const handleUpdateMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-      await dispatch(updateAffiliateThunk({
-        groupId: groupData.id,
-        affiliateId: editingId,
-        payload: editData,
-      }));
-      setEditingId(null);
-      setEditData(null);
+    if (!editingId) return;
+    setEditError('');
+    const result = await dispatch(updateAffiliateThunk({
+      groupId: groupData.id,
+      affiliateId: editingId,
+      payload: sanitizePayload(editData),
+    }));
+    if (updateAffiliateThunk.rejected.match(result)) {
+      setEditError((result.payload as any)?.message || 'Error al actualizar el miembro.');
+      return;
     }
+    setEditingId(null);
+    setEditData(null);
   };
 
   const handleRemoveMember = async (affiliateId: number) => {
@@ -73,15 +92,16 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
   };
 
   const startEdit = (affiliate: any) => {
+    setEditError('');
     setEditingId(affiliate.id);
     setEditData({
       firstName: affiliate.firstName ?? '',
       lastName: affiliate.lastName ?? '',
       documentNumber: String(affiliate.documentNumber ?? ''),
       birthDate: affiliate.birthDate ? affiliate.birthDate.slice(0, 10) : '',
-      address: affiliate.address ?? '',
-      email: affiliate.email ?? '',
-      phone: affiliate.phone ?? '',
+      address: String(affiliate.address ?? ''),
+      email: String(affiliate.email ?? ''),
+      phone: String(affiliate.phone ?? ''),
     });
   };
 
@@ -188,10 +208,16 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
                 <span className="text-sm font-semibold text-slate-900">Es titular</span>
               </label>
 
+              {addError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {addError}
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowAddForm(false)}
+                  onClick={() => { setShowAddForm(false); setAddError(''); }}
                   className="flex-1 px-3 py-2 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-100 transition-colors"
                 >
                   Cancelar
@@ -271,10 +297,16 @@ const MembersModal: React.FC<MembersModalProps> = ({ groupData, onClose }) => {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               />
 
+              {editError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {Array.isArray(editError) ? (editError as string[]).join(', ') : editError}
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setEditingId(null)}
+                  onClick={() => { setEditingId(null); setEditError(''); }}
                   className="flex-1 px-3 py-2 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-100 transition-colors"
                 >
                   Cancelar

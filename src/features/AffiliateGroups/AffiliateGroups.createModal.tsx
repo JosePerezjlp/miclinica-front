@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
+import { useAffiliatesPermissions } from "../../hooks/useAffiliatesPermissions";
 import {
   affiliatesService,
   type AffiliateResponse,
@@ -47,7 +48,6 @@ function makeEmptyCashMember(): CashMember {
     address: "",
     email: "",
     phone: "",
-    inscriptionDate: new Date().toISOString().slice(0, 10),
   };
 }
 
@@ -192,6 +192,10 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [autoDniMatchedAffiliate, setAutoDniMatchedAffiliate] =
     useState<AffiliateResponse | null>(null);
+  const today = new Date().toISOString().slice(0, 10);
+  const [autoInscriptionDate, setAutoInscriptionDate] = useState(today);
+  const [cashInscriptionDate, setCashInscriptionDate] = useState(today);
+  const hasFullAffiliatesPerms = useAffiliatesPermissions();
   const autoFormRef = useRef<HTMLFormElement | null>(null);
   const cashFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -779,7 +783,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
       address: memberDraft.address.trim(),
       email: memberDraft.email.trim(),
       phone: memberDraft.phone.trim(),
-      inscriptionDate: memberDraft.inscriptionDate.trim(),
     };
 
     if (editingMemberId !== null) {
@@ -867,6 +870,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
         mode: "automatic" as const,
         ...autoData,
         paywayPaymentMethodId: detectedPaywayMethodId ?? undefined,
+        inscriptionDate: autoInscriptionDate,
       };
 
       const result = await onSubmit(submitData);
@@ -907,6 +911,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
         mode: "cash" as const,
         ...cashData,
         members,
+        inscriptionDate: cashInscriptionDate,
       };
 
       await onSubmit(submitData);
@@ -983,6 +988,9 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
     setCashError("");
     setEditingMemberId(null);
     setMemberIdCounter(1);
+    const resetToday = new Date().toISOString().slice(0, 10);
+    setAutoInscriptionDate(resetToday);
+    setCashInscriptionDate(resetToday);
   };
 
   if (!isOpen) return null;
@@ -1068,6 +1076,29 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
             onSubmit={handleSubmitAuto}
             className="px-6 py-6 space-y-6"
           >
+            {/* Fecha de Inscripción */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Fecha de Inscripción
+              </label>
+              {hasFullAffiliatesPerms ? (
+                <input
+                  type="date"
+                  value={autoInscriptionDate}
+                  max={today}
+                  onChange={(e) => setAutoInscriptionDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                <input
+                  type="date"
+                  value={autoInscriptionDate}
+                  readOnly
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-600 cursor-not-allowed"
+                />
+              )}
+            </div>
+
             {/* Promotor, Vendedor */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -1423,14 +1454,19 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
             </div>
 
             {autoDniMatchedAffiliate && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                <p className="font-semibold">
-                  DNI ya registrado — Grupo #{autoDniMatchedAffiliate.familiarGroupId}
+              <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-1.5">
+                <p className="font-semibold flex items-center gap-2">
+                  <span>⚠</span>
+                  <span>
+                    Este afiliado ya pertenece al Grupo #{autoDniMatchedAffiliate.familiarGroupId}
+                  </span>
                 </p>
                 <p>
-                  {autoDniMatchedAffiliate.firstName}{" "}
-                  {autoDniMatchedAffiliate.lastName}. Los datos fueron completados
-                  automáticamente. Podés editarlos antes de continuar.
+                  <span className="font-medium">{autoDniMatchedAffiliate.firstName} {autoDniMatchedAffiliate.lastName}</span>{" "}
+                  fue encontrado en el sistema y sus datos fueron completados automáticamente.
+                </p>
+                <p className="text-amber-800">
+                  Si continuás, este afiliado <span className="font-semibold">será dado de baja del Grupo #{autoDniMatchedAffiliate.familiarGroupId}</span> y pasará a pertenecer al nuevo grupo familiar que estás creando.
                 </p>
               </div>
             )}
@@ -1466,7 +1502,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                 ) : autoData.gateway === "MOBBEX" ? (
                   "GENERAR LINK DE MOBBEX"
                 ) : (
-                  "COBRAR"
+                  "CREAR GRUPO FAMILIAR"
                 )}
               </button>
             </div>
@@ -1485,6 +1521,29 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                 {cashError}
               </div>
             )}
+
+            {/* Fecha de Inscripción */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Fecha de Inscripción
+              </label>
+              {hasFullAffiliatesPerms ? (
+                <input
+                  type="date"
+                  value={cashInscriptionDate}
+                  max={today}
+                  onChange={(e) => setCashInscriptionDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                <input
+                  type="date"
+                  value={cashInscriptionDate}
+                  readOnly
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-600 cursor-not-allowed"
+                />
+              )}
+            </div>
 
             {/* Top selects */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1663,14 +1722,17 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
 
             <div className="border-t border-slate-200 pt-6">
               {memberDraftMatchedAffiliate && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 mb-4">
-                  <p className="font-semibold">
-                    DNI ya registrado — Grupo #{memberDraftMatchedAffiliate.familiarGroupId}
+                <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 space-y-1.5 mb-4">
+                  <p className="font-semibold flex items-center gap-2">
+                    <span>⚠</span>
+                    <span>Este afiliado ya pertenece al Grupo #{memberDraftMatchedAffiliate.familiarGroupId}</span>
                   </p>
                   <p>
-                    {memberDraftMatchedAffiliate.firstName}{" "}
-                    {memberDraftMatchedAffiliate.lastName}. Los datos fueron
-                    completados automáticamente. Podés editarlos antes de continuar.
+                    <span className="font-medium">{memberDraftMatchedAffiliate.firstName} {memberDraftMatchedAffiliate.lastName}</span>{" "}
+                    fue encontrado en el sistema y sus datos fueron completados automáticamente.
+                  </p>
+                  <p className="text-amber-800">
+                    Si continuás, este afiliado <span className="font-semibold">será dado de baja del Grupo #{memberDraftMatchedAffiliate.familiarGroupId}</span> y pasará a pertenecer al nuevo grupo familiar que estás creando.
                   </p>
                 </div>
               )}
@@ -1790,7 +1852,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-2">
                         Email
@@ -1815,17 +1877,6 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                           handleMemberDraftChange("phone", e.target.value)
                         }
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Fecha de Inscripción
-                      </label>
-                      <input
-                        type="date"
-                        value={memberDraft.inscriptionDate}
-                        readOnly
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -1895,15 +1946,7 @@ const AffiliateGroupsCreateModal: React.FC<CreateAffiliateModalProps> = ({
                         </button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-slate-500">
-                          Fecha de inscripción
-                        </p>
-                        <p className="text-sm text-slate-700">
-                          {member.inscriptionDate || "-"}
-                        </p>
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs uppercase tracking-wide text-slate-500">
                           Teléfono

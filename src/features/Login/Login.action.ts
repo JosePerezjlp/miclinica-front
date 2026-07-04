@@ -3,7 +3,7 @@ import type { RootState } from "../../store/store";
 import type { Action } from "redux";
 import toast from "react-hot-toast";
 import { AuthService } from "../../api/auth.service";
-import { setAuthTokens } from "../../api/tokenStorage";
+import { setAuthTokens, setUserRoles } from "../../api/tokenStorage";
 
 // Action constants
 export const LOGIN = "LOGIN";
@@ -35,6 +35,7 @@ export const onLoginThunk =
         credentials.password,
       );
       setAuthTokens(data.accessToken, data.refreshToken);
+      if (data.roles) setUserRoles(data.roles);
       dispatch(onLoginSuccess(data.accessToken));
       callbacks?.onSuccess?.();
     } catch (err: unknown) {

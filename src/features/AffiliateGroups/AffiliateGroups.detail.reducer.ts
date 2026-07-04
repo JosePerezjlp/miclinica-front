@@ -15,6 +15,7 @@ import {
   updatePlanThunk,
   chargeNowForPeriodThunk,
   settleDebtByGatewayThunk,
+  updateManualPaymentThunk,
 } from "./AffiliateGroups.detail.action";
 
 const initialState: GroupDetailState = {
@@ -219,6 +220,20 @@ const groupDetailSlice = createSlice({
       })
       .addCase(settleDebtByGatewayThunk.rejected, (state) => {
         state.loading = false;
+      })
+
+      // Update Manual Payment
+      .addCase(updateManualPaymentThunk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateManualPaymentThunk.fulfilled, (state, action) => {
+        state.loading = false;
+        state.data = action.payload;
+      })
+      .addCase(updateManualPaymentThunk.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || "Error desconocido";
       });
   },
 });
