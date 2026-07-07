@@ -1,3 +1,8 @@
+export interface PlanBenefitSummary {
+  id: number;
+  name: string;
+}
+
 export interface PlanResponse {
   id: number;
   name: string;
@@ -6,6 +11,7 @@ export interface PlanResponse {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  benefits?: PlanBenefitSummary[];
 }
 
 export interface CreatePlanRequest {

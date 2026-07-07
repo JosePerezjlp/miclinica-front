@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { Pencil, Plus, Power, Search, ShieldCheck } from "lucide-react";
+import {
+  Pencil,
+  Plus,
+  Power,
+  Search,
+  ShieldCheck,
+  Gift,
+} from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   createPlanThunk,
@@ -16,7 +23,7 @@ type PlanFormState = {
   isActive: boolean;
 };
 
-const emptyForm: PlanFormState = {
+const emptyPlanForm: PlanFormState = {
   name: "",
   monthlyFee: "",
   gracePeriodDays: "0",
@@ -24,20 +31,16 @@ const emptyForm: PlanFormState = {
 };
 
 function formatCurrency(value: number | string) {
-  const numericValue = typeof value === "number" ? value : Number(value);
-
+  const n = typeof value === "number" ? value : Number(value);
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
     currency: "ARS",
     minimumFractionDigits: 2,
-  }).format(Number.isNaN(numericValue) ? 0 : numericValue);
+  }).format(Number.isNaN(n) ? 0 : n);
 }
 
-function buildForm(plan?: PlanResponse): PlanFormState {
-  if (!plan) {
-    return emptyForm;
-  }
-
+function buildPlanForm(plan?: PlanResponse): PlanFormState {
+  if (!plan) return emptyPlanForm;
   return {
     name: plan.name,
     monthlyFee: String(plan.monthlyFee),
@@ -48,42 +51,37 @@ function buildForm(plan?: PlanResponse): PlanFormState {
 
 const PlansContainer = () => {
   const dispatch = useAppDispatch();
-  const { data, loading, saveLoading } = useAppSelector((state) => state.plans);
+  const { data, loading, saveLoading } = useAppSelector((s) => s.plans);
 
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "active" | "inactive"
-  >("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanResponse | null>(null);
-  const [form, setForm] = useState<PlanFormState>(emptyForm);
+  const [form, setForm] = useState<PlanFormState>(emptyPlanForm);
 
   useEffect(() => {
     dispatch(getPlansThunk());
   }, [dispatch]);
 
   const filteredPlans = data.filter((plan) => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const q = query.trim().toLowerCase();
     const matchesQuery =
-      !normalizedQuery ||
-      plan.name.toLowerCase().includes(normalizedQuery) ||
-      String(plan.id).includes(normalizedQuery);
+      !q || plan.name.toLowerCase().includes(q) || String(plan.id).includes(q);
     const matchesStatus =
       statusFilter === "all" ||
       (statusFilter === "active" ? plan.isActive : !plan.isActive);
-
     return matchesQuery && matchesStatus;
   });
 
   const openCreateModal = () => {
     setEditingPlan(null);
-    setForm(emptyForm);
+    setForm(emptyPlanForm);
     setIsModalOpen(true);
   };
 
   const openEditModal = (plan: PlanResponse) => {
     setEditingPlan(plan);
-    setForm(buildForm(plan));
+    setForm(buildPlanForm(plan));
     setIsModalOpen(true);
   };
 
@@ -91,7 +89,7 @@ const PlansContainer = () => {
     if (saveLoading) return;
     setIsModalOpen(false);
     setEditingPlan(null);
-    setForm(emptyForm);
+    setForm(emptyPlanForm);
   };
 
   const handleSubmit = async () => {
@@ -100,32 +98,22 @@ const PlansContainer = () => {
       monthlyFee: Number(form.monthlyFee),
       gracePeriodDays: Number(form.gracePeriodDays || 0),
     };
-
-    if (!payload.name || Number.isNaN(payload.monthlyFee)) {
-      return;
-    }
+    if (!payload.name || Number.isNaN(payload.monthlyFee)) return;
 
     if (editingPlan) {
-      await dispatch(
-        updatePlanThunk(editingPlan.id, {
-          ...payload,
-          isActive: form.isActive,
-        }),
-      );
+      await dispatch(updatePlanThunk(editingPlan.id, { ...payload, isActive: form.isActive }));
     } else {
       await dispatch(createPlanThunk(payload));
     }
-
     closeModal();
   };
 
   const handleToggleActive = async (plan: PlanResponse) => {
     if (plan.isActive) {
       await dispatch(deletePlanThunk(plan.id));
-      return;
+    } else {
+      await dispatch(updatePlanThunk(plan.id, { isActive: true }));
     }
-
-    await dispatch(updatePlanThunk(plan.id, { isActive: true }));
   };
 
   return (
@@ -139,7 +127,6 @@ const PlansContainer = () => {
             Administración de planes de cobertura
           </p>
         </div>
-
         <button
           type="button"
           onClick={openCreateModal}
@@ -158,18 +145,13 @@ const PlansContainer = () => {
               type="text"
               placeholder="Buscar por nombre o ID"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(e) => setQuery(e.target.value)}
               className="w-full h-10 pl-9 pr-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-
           <select
             value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(
-                event.target.value as "all" | "active" | "inactive",
-              )
-            }
+            onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
             className="h-10 px-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">Todos</option>
@@ -186,6 +168,7 @@ const PlansContainer = () => {
                 <th className="px-4 py-3 font-semibold">Plan</th>
                 <th className="px-4 py-3 font-semibold">Cuota</th>
                 <th className="px-4 py-3 font-semibold">Gracia</th>
+                <th className="px-4 py-3 font-semibold">Beneficios</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
                 <th className="px-4 py-3 font-semibold">Actualizado</th>
                 <th className="px-4 py-3 font-semibold text-right">Acciones</th>
@@ -193,17 +176,10 @@ const PlansContainer = () => {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredPlans.map((plan) => (
-                <tr
-                  key={plan.id}
-                  className="hover:bg-slate-50 transition-colors"
-                >
-                  <td className="px-6 py-4 text-slate-400 font-medium">
-                    {plan.id}
-                  </td>
+                <tr key={plan.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 text-slate-400 font-medium">{plan.id}</td>
                   <td className="px-4 py-4">
-                    <div className="font-semibold text-slate-900">
-                      {plan.name}
-                    </div>
+                    <div className="font-semibold text-slate-900">{plan.name}</div>
                     <div className="text-xs text-slate-500 mt-1">
                       Creado {new Date(plan.createdAt).toLocaleDateString()}
                     </div>
@@ -212,8 +188,17 @@ const PlansContainer = () => {
                     {formatCurrency(plan.monthlyFee)}
                   </td>
                   <td className="px-4 py-4 text-slate-600">
-                    {plan.gracePeriodDays} día
-                    {plan.gracePeriodDays === 1 ? "" : "s"}
+                    {plan.gracePeriodDays} día{plan.gracePeriodDays === 1 ? "" : "s"}
+                  </td>
+                  <td className="px-4 py-4">
+                    {(plan.benefits ?? []).length > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold bg-violet-100 text-violet-700">
+                        <Gift className="w-3 h-3" />
+                        {(plan.benefits ?? []).length} beneficio{(plan.benefits ?? []).length === 1 ? "" : "s"}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-4">
                     <span
@@ -265,7 +250,6 @@ const PlansContainer = () => {
             No hay planes que coincidan con el filtro actual.
           </div>
         )}
-
         {loading && (
           <div className="px-6 py-10 text-center text-slate-500 text-sm">
             Cargando planes...
@@ -281,7 +265,8 @@ const PlansContainer = () => {
                 {editingPlan ? "Editar plan" : "Crear plan"}
               </h2>
               <p className="text-sm text-slate-500 mt-1">
-                Definí nombre, cuota mensual y periodo de gracia.
+                Definí nombre, cuota mensual y periodo de gracia. Los beneficios se
+                asignan desde la sección "Beneficios".
               </p>
             </div>
 
@@ -291,16 +276,10 @@ const PlansContainer = () => {
                 <input
                   type="text"
                   value={form.name}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   className="w-full h-11 px-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </label>
-
               <label className="space-y-2 text-sm text-slate-700 font-medium">
                 <span>Cuota mensual</span>
                 <input
@@ -308,16 +287,10 @@ const PlansContainer = () => {
                   min="0"
                   step="0.01"
                   value={form.monthlyFee}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      monthlyFee: event.target.value,
-                    }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, monthlyFee: e.target.value }))}
                   className="w-full h-11 px-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </label>
-
               <label className="space-y-2 text-sm text-slate-700 font-medium">
                 <span>Días de gracia</span>
                 <input
@@ -325,27 +298,16 @@ const PlansContainer = () => {
                   min="0"
                   step="1"
                   value={form.gracePeriodDays}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      gracePeriodDays: event.target.value,
-                    }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, gracePeriodDays: e.target.value }))}
                   className="w-full h-11 px-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </label>
-
               {editingPlan && (
                 <label className="sm:col-span-2 inline-flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700">
                   <input
                     type="checkbox"
                     checked={form.isActive}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        isActive: event.target.checked,
-                      }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
                     className="h-4 w-4 rounded border-slate-300"
                   />
                   Plan activo
@@ -364,9 +326,7 @@ const PlansContainer = () => {
               <button
                 type="button"
                 onClick={() => void handleSubmit()}
-                disabled={
-                  saveLoading || !form.name.trim() || !form.monthlyFee.trim()
-                }
+                disabled={saveLoading || !form.name.trim() || !form.monthlyFee.trim()}
                 className="h-10 px-5 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white text-sm font-semibold transition-colors"
               >
                 {saveLoading

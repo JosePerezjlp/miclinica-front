@@ -5,6 +5,7 @@ import RegisterContainer from "./features/Register/Register.container";
 import DashboardContainer from "./features/Dashboard/Dashboard.container";
 import AffiliateGroupsContainer from "./features/AffiliateGroups/AffiliateGroups.container";
 import PlansContainer from "./features/Plans/Plans.container";
+import BenefitsContainer from "./features/Benefits/Benefits.container";
 import PromotersContainer from "./features/Promoters/Promoters.container";
 import CitiesContainer from "./features/Cities/Cities.container";
 import UsersContainer from "./features/Users/Users.container";
@@ -79,6 +80,16 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <PlansContainer />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/benefits"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <BenefitsContainer />
               </DashboardLayout>
             </ProtectedRoute>
           }
