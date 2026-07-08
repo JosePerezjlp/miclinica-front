@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
   CreditCard,
@@ -30,8 +30,11 @@ import {
   type UnifiedPaymentEntry,
 } from "./modals/AffiliateGroups.billing.modal";
 import { applyDiscount } from "../../api/groupDetail.service";
+import { calculateNextChargeDate } from "./AffiliateGroups.utils";
+import { MovementsContent } from "./AffiliateGroups.movements";
 
 type DetailTab = "information" | "transactions";
+type TransactionsView = "billing" | "movements";
 type GroupAffiliate = GroupDetailData["affiliates"][number];
 type SettlementPreviewItem = {
   billingPeriodId: number;
@@ -49,35 +52,6 @@ const buildBillingPeriodKey = (month: number, year: number) =>
 
 const formatBillingPeriodLabel = (month: number, year: number) =>
   `${String(month).padStart(2, "0")}/${year}`;
-
-const clampChargeDay = (year: number, month: number, chargeDay: number) => {
-  const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
-  return Math.min(Math.max(chargeDay, 1), lastDayOfMonth);
-};
-
-const calculateNextChargeDate = (chargeDay: number, now = new Date()) => {
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-  const currentMonthDay = clampChargeDay(currentYear, currentMonth, chargeDay);
-  const currentCandidate = new Date(currentYear, currentMonth, currentMonthDay);
-
-  if (currentCandidate.getTime() > now.getTime()) {
-    return currentCandidate;
-  }
-
-  const nextMonthDate = new Date(currentYear, currentMonth + 1, 1);
-  const nextMonthDay = clampChargeDay(
-    nextMonthDate.getFullYear(),
-    nextMonthDate.getMonth(),
-    chargeDay,
-  );
-
-  return new Date(
-    nextMonthDate.getFullYear(),
-    nextMonthDate.getMonth(),
-    nextMonthDay,
-  );
-};
 
 const formatAffiliateFullName = (affiliate: GroupAffiliate) =>
   [affiliate.firstName, affiliate.lastName].filter(Boolean).join(" ") ||
@@ -191,6 +165,7 @@ const PLAN_STATUS_LABELS: Record<string, string> = {
 const AffiliateGroupsDetailContainer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
 
   const {
@@ -206,6 +181,8 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
     "info" | "members" | "payments" | "plans" | null
   >(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("transactions");
+  const [transactionsView, setTransactionsView] =
+    useState<TransactionsView>("billing");
   const [selectedAffiliate, setSelectedAffiliate] =
     useState<GroupAffiliate | null>(null);
   const [paymentToSettle, setPaymentToSettle] =
@@ -255,6 +232,19 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
       dispatch(getGroupDetailThunk(parseInt(id, 10)));
     }
   }, [dispatch, id]);
+
+  // Al llegar recién creado desde el alta de pago automático, abrir el modal
+  // de miembros para completar los datos del cliente en el momento.
+  useEffect(() => {
+    const shouldOpenMembers = (
+      location.state as { openMembersModal?: boolean } | null
+    )?.openMembersModal;
+
+    if (groupData && shouldOpenMembers) {
+      setActiveModal("members");
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [groupData, location, navigate]);
 
   if (!id) {
     return (
@@ -829,6 +819,18 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
                     </p>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs uppercase text-slate-500 font-semibold">
+                      Fecha de inscripción
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900 mt-1">
+                      {groupData.joinedAt
+                        ? new Date(groupData.joinedAt).toLocaleDateString("es-AR")
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1044,36 +1046,72 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-slate-900">Transacciones</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Historial completo de facturación, pagos y saldo por período.
-            </p>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                {transactionsView === "billing" ? "Transacciones" : "Movimientos"}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {transactionsView === "billing"
+                  ? "Historial completo de facturación, pagos y saldo por período."
+                  : "Historial completo de cobros automáticos, fallos y movimientos de cuenta corriente, ordenados por fecha."}
+              </p>
+            </div>
+            <div className="bg-slate-100 rounded-lg p-1 inline-flex gap-1">
+              <button
+                type="button"
+                onClick={() => setTransactionsView("billing")}
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                  transactionsView === "billing"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Transacciones
+              </button>
+              <button
+                type="button"
+                onClick={() => setTransactionsView("movements")}
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                  transactionsView === "movements"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Movimientos
+              </button>
+            </div>
           </div>
 
-          {chargeNowFeedback && (
-            <div
-              className={`mb-4 rounded-lg px-4 py-3 text-sm font-semibold ${
-                chargeNowFeedback.ok
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : "bg-red-50 text-red-700 border border-red-200"
-              }`}
-            >
-              {chargeNowFeedback.message}
-            </div>
+          {transactionsView === "billing" ? (
+            <>
+              {chargeNowFeedback && (
+                <div
+                  className={`mb-4 rounded-lg px-4 py-3 text-sm font-semibold ${
+                    chargeNowFeedback.ok
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-red-50 text-red-700 border border-red-200"
+                  }`}
+                >
+                  {chargeNowFeedback.message}
+                </div>
+              )}
+              <BillingContent
+                groupData={groupData}
+                onPayRemaining={nextAutomaticMethod ? handleChargeNow : openSettlePaymentModal}
+                onCheckStatus={handleCheckStatus}
+                onApplyDiscount={handleOpenDiscount}
+                onEditPayment={handleEditPayment}
+                chargeLabel={nextAutomaticMethod ? "Cobrar" : "Pagar"}
+                chargingPeriodId={chargingPeriodId}
+                checkingPeriodId={checkingPeriodId}
+                billingBalance={billingBalance}
+                onOpenDebtSettlement={openDebtSettlementModal}
+              />
+            </>
+          ) : (
+            <MovementsContent groupData={groupData} />
           )}
-          <BillingContent
-            groupData={groupData}
-            onPayRemaining={nextAutomaticMethod ? handleChargeNow : openSettlePaymentModal}
-            onCheckStatus={handleCheckStatus}
-            onApplyDiscount={handleOpenDiscount}
-            onEditPayment={handleEditPayment}
-            chargeLabel={nextAutomaticMethod ? "Cobrar" : "Pagar"}
-            chargingPeriodId={chargingPeriodId}
-            checkingPeriodId={checkingPeriodId}
-            billingBalance={billingBalance}
-            onOpenDebtSettlement={openDebtSettlementModal}
-          />
         </div>
       )}
 

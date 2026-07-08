@@ -6,6 +6,7 @@ import {
   CreditCard,
   Landmark,
   MessageCircle,
+  Pencil,
   Search,
   Wallet,
 } from "lucide-react";
@@ -19,6 +20,8 @@ import type { AppDispatch, RootState } from "../../store/store";
 import { getGroupsThunk, onCreateGroupThunk } from "./AffiliateGroups.action";
 import { getGroupDetailThunk } from "./AffiliateGroups.detail.action";
 import PaymentMethodsModal from "./modals/AffiliateGroups.paymentMethods.modal";
+import MembersModal from "./modals/AffiliateGroups.members.modal";
+import { calculateNextChargeDate } from "./AffiliateGroups.utils";
 
 const STATUS_CLASS: Record<AffiliateStatus, string> = {
   active: "bg-emerald-100 text-emerald-700",
@@ -44,6 +47,24 @@ const GROUP_STATUS_LABEL: Record<string, string> = {
   NO_COVERAGE: "SIN COBERTURA",
   GRACE_PERIOD: "GRACIA",
 };
+
+function getStatusReason(group: {
+  planStatus?: string | null;
+  gracePeriodEndsAt?: string | null;
+}): string | null {
+  switch (group.planStatus) {
+    case "GRACE_PERIOD":
+      return group.gracePeriodEndsAt
+        ? `Vence el ${new Date(group.gracePeriodEndsAt).toLocaleDateString()}`
+        : "En período de gracia";
+    case "EXPIRED":
+      return "Plan vencido — pago pendiente";
+    case "NO_COVERAGE":
+      return "Sin plan asignado";
+    default:
+      return null;
+  }
+}
 
 const buildWhatsAppUrl = (phone?: string | null) => {
   const digits = (phone ?? "").replace(/\D/g, "");
@@ -104,6 +125,7 @@ const AffiliateGroupsContainer: React.FC = () => {
   const [page, setPage] = useState(1);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [paymentMethodGroupId, setPaymentMethodGroupId] = useState<number | null>(null);
+  const [membersGroupId, setMembersGroupId] = useState<number | null>(null);
 
   const handleClear = () => {
     setSearch("");
@@ -119,6 +141,13 @@ const AffiliateGroupsContainer: React.FC = () => {
     const result = await dispatch(onCreateGroupThunk(data));
 
     if (result?.group) {
+      if (data.mode === "automatic") {
+        navigate(`/affiliate-groups/${result.group.id}`, {
+          state: { openMembersModal: true },
+        });
+        return result;
+      }
+
       setPage(1);
       dispatch(
         getGroupsThunk({
@@ -144,6 +173,23 @@ const AffiliateGroupsContainer: React.FC = () => {
 
   const handleClosePaymentMethods = () => {
     setPaymentMethodGroupId(null);
+  };
+
+  const handleOpenMembers = (groupId: number) => {
+    setMembersGroupId(groupId);
+    dispatch(getGroupDetailThunk(groupId));
+  };
+
+  const handleCloseMembers = () => {
+    setMembersGroupId(null);
+    dispatch(
+      getGroupsThunk({
+        page,
+        pageSize: meta.pageSize,
+        search,
+        paymentType: paymentFilter,
+      }),
+    );
   };
 
   useEffect(() => {
@@ -248,6 +294,7 @@ const AffiliateGroupsContainer: React.FC = () => {
                 <th className="px-4 py-3 font-semibold">
                   Fecha de Inscripción
                 </th>
+                <th className="px-4 py-3 font-semibold">Fecha de Cobro</th>
                 <th className="px-4 py-3 font-semibold">DNI</th>
                 <th className="px-4 py-3 font-semibold">Teléfono</th>
                 <th className="px-4 py-3 font-semibold">Plan</th>
@@ -282,7 +329,7 @@ const AffiliateGroupsContainer: React.FC = () => {
                       {/* Spacer between groups */}
                       {groupIndex > 0 && (
                         <tr aria-hidden="true">
-                          <td colSpan={10} className="h-2 bg-slate-100 p-0" />
+                          <td colSpan={11} className="h-2 bg-slate-100 p-0" />
                         </tr>
                       )}
 
@@ -307,7 +354,15 @@ const AffiliateGroupsContainer: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-4 text-slate-600">
-                          {new Date(group.createdAt).toLocaleDateString()}
+                          <div>{new Date(group.createdAt).toLocaleDateString()}</div>
+                          <div className="mt-1 text-xs font-medium text-slate-400">
+                            Día de cobro: {group.chargeDay}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-slate-600">
+                          {calculateNextChargeDate(
+                            group.chargeDay,
+                          ).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-4 text-slate-600 font-mono text-xs">
                           -
@@ -336,6 +391,11 @@ const AffiliateGroupsContainer: React.FC = () => {
                               group.planStatus ??
                               "N/A"}
                           </span>
+                          {getStatusReason(group) && (
+                            <div className="mt-1 text-xs font-medium text-slate-400">
+                              {getStatusReason(group)}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-4 text-right">
                           <button
@@ -395,6 +455,7 @@ const AffiliateGroupsContainer: React.FC = () => {
                                 ? new Date(affiliate.birthDate).toLocaleDateString()
                                 : "—"}
                             </td>
+                            <td className="px-4 py-2.5 text-slate-400 text-xs">—</td>
                             <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">
                               {affiliate.documentNumber ?? "—"}
                             </td>
@@ -408,8 +469,15 @@ const AffiliateGroupsContainer: React.FC = () => {
                                 {affiliate.isVerified ? "Verificado" : "Sin verificar"}
                               </span>
                             </td>
-                            <td className="px-4 py-2.5 text-right text-[10px] text-slate-400 font-medium">
-                              Afiliado
+                            <td className="px-4 py-2.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenMembers(group.id)}
+                                className="inline-flex items-center gap-1 rounded-lg p-1.5 text-slate-400 hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                                title="Gestionar miembros"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -419,7 +487,7 @@ const AffiliateGroupsContainer: React.FC = () => {
               ) : (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={11}
                     className="px-6 py-8 text-center text-slate-500"
                   >
                     {loading
@@ -497,6 +565,21 @@ const AffiliateGroupsContainer: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl px-8 py-6 text-slate-700 font-semibold">
             Cargando formas de pago...
+          </div>
+        </div>
+      )}
+
+      {membersGroupId !== null && groupDetailData && groupDetailData.id === membersGroupId && (
+        <MembersModal
+          groupData={groupDetailData}
+          onClose={handleCloseMembers}
+        />
+      )}
+
+      {membersGroupId !== null && groupDetailLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl px-8 py-6 text-slate-700 font-semibold">
+            Cargando miembros...
           </div>
         </div>
       )}

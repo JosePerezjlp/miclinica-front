@@ -17,6 +17,7 @@ interface GroupInfoModalProps {
 interface FormState {
   isActive: boolean;
   chargeDay: number;
+  joinedAt: string;
   promoterId: number | null;
   cityId: number | null;
 }
@@ -25,6 +26,7 @@ function toFormState(groupData: GroupDetailData): FormState {
   return {
     isActive: groupData.isActive,
     chargeDay: groupData.chargeDay,
+    joinedAt: groupData.joinedAt ? groupData.joinedAt.slice(0, 10) : "",
     promoterId: groupData.promoterId,
     cityId: groupData.cityId ?? null,
   };
@@ -34,6 +36,7 @@ function hasChanges(original: FormState, current: FormState): boolean {
   return (
     original.isActive !== current.isActive ||
     original.chargeDay !== current.chargeDay ||
+    original.joinedAt !== current.joinedAt ||
     original.promoterId !== current.promoterId ||
     original.cityId !== current.cityId
   );
@@ -96,6 +99,7 @@ const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
         payload: {
           isActive: formData.isActive,
           chargeDay: formData.chargeDay,
+          ...(formData.joinedAt ? { joinedAt: formData.joinedAt } : {}),
           ...(formData.promoterId !== null
             ? { promoterId: formData.promoterId }
             : {}),
@@ -212,6 +216,24 @@ const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
             <p className="mt-2 text-xs text-slate-500">
               Define el día del mes en que vence la próxima cuota.
             </p>
+          </div>
+
+          {/* Fecha de inscripción */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-900 mb-2">
+              Fecha de inscripción
+            </label>
+            <input
+              type="date"
+              value={formData.joinedAt}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  joinedAt: e.target.value,
+                }))
+              }
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+            />
           </div>
 
           {/* Grupo activo */}

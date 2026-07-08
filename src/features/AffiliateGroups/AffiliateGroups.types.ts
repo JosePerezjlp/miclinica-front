@@ -128,6 +128,8 @@ export interface GroupResponse {
     name: string;
   } | null;
   planStatus?: string | null;
+  gracePeriodEndsAt?: string | null;
+  chargeDay: number;
   affiliates: Array<{
     id: number;
     firstName: string;
