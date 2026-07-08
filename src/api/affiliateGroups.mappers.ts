@@ -165,6 +165,7 @@ export function mapAutomaticFormToCreateGroupRequest(
     planName: payload.gateway === "MOBBEX" ? payload.plan : undefined,
     promoterId: payload.promoterId,
     cityId: payload.cityId ?? undefined,
+    joinedAt: payload.inscriptionDate || new Date().toISOString().slice(0, 10),
     affiliates: [
       {
         firstName: holderFirstName,
@@ -210,6 +211,7 @@ export function mapCashFormToCreateGroupRequest(
     planId: payload.planId,
     promoterId: payload.promoterId,
     cityId: payload.cityId,
+    joinedAt: payload.inscriptionDate || new Date().toISOString().slice(0, 10),
     affiliates: mapCashFormToAffiliateRequests(payload),
     initialManualPayment:
       Number(payload.paidAmount ?? 0) > 0

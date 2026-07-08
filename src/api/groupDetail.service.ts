@@ -180,6 +180,41 @@ export const updatePlan = async (
   return transformNumericStrings(data);
 };
 
+export const applyDiscount = async (
+  groupId: number,
+  payload: {
+    billingPeriodId: number;
+    amount: number;
+    type: "PARTIAL" | "TOTAL";
+    reason?: string;
+    appliedBy: string;
+  },
+): Promise<{ id: number }> => {
+  const { data } = await apiClient.post(
+    `/groups/${groupId}/billing/discounts`,
+    payload,
+  );
+  return data;
+};
+
+export const updateManualPayment = async (
+  groupId: number,
+  paymentId: number,
+  payload: {
+    amount?: number;
+    paidAt?: string;
+    reference?: string;
+    notes?: string;
+  },
+): Promise<GroupDetailData> => {
+  await apiClient.patch(
+    `/groups/${groupId}/billing/manual-payments/${paymentId}`,
+    payload,
+  );
+  const { data } = await apiClient.get(`/groups/${groupId}`);
+  return transformNumericStrings(data);
+};
+
 export const checkSiroStatus = async (
   groupId: number,
   billingPeriodId: number,

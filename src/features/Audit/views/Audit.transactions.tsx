@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronDown, AlertCircle, CheckCircle } from "lucide-react";
 import type { AuditTransactionsResponse } from "../Audit.types";
 import {
@@ -15,6 +16,7 @@ interface Props {
 }
 
 const AuditTransactionsView: React.FC<Props> = ({ data }) => {
+  const navigate = useNavigate();
   const [expandedRows, setExpandedRows] = React.useState<Set<number>>(
     new Set(),
   );
@@ -152,12 +154,18 @@ const AuditTransactionsView: React.FC<Props> = ({ data }) => {
                       {formatDate(transaction.createdAt)}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <div className="font-semibold text-slate-900">
-                        {transaction.familiarGroup.name}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {transaction.familiarGroup.holderFullName}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/affiliate-groups/${transaction.familiarGroup.id}`)}
+                        className="text-left hover:underline"
+                      >
+                        <div className="font-semibold text-teal-700 hover:text-teal-900">
+                          {transaction.familiarGroup.name}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {transaction.familiarGroup.holderFullName}
+                        </div>
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <span

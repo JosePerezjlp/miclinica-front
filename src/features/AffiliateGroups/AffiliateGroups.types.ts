@@ -27,7 +27,6 @@ export interface CashMember {
   address: string;
   email: string;
   phone: string;
-  inscriptionDate: string;
   existingGroupId?: number;
 }
 
@@ -54,6 +53,7 @@ export interface AutomaticAffiliateGroupFormData {
   dni: string;
   deviceFingerprintId: string;
   paywayPaymentMethodId?: number;
+  inscriptionDate?: string;
 }
 
 export interface CashAffiliateGroupFormData {
@@ -70,6 +70,7 @@ export interface CashAffiliateGroupFormData {
   city: string;
   cityId?: number | null;
   members: CashMember[];
+  inscriptionDate?: string;
 }
 
 export type CreateAffiliateGroupModalPayload =
@@ -94,6 +95,7 @@ export interface CreateGroupRequest {
   promoterId?: number;
   cityId?: number | null;
   planName?: string;
+  joinedAt?: string;
   affiliates: CreateAffiliateRequest[];
   paymentMethod?: CreateGroupPaymentMethodRequest;
   initialManualPayment?: CreateManualPaymentRequest;

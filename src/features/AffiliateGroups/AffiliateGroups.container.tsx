@@ -17,6 +17,8 @@ import type {
 import AffiliateGroupsCreateModal from "./AffiliateGroups.createModal";
 import type { AppDispatch, RootState } from "../../store/store";
 import { getGroupsThunk, onCreateGroupThunk } from "./AffiliateGroups.action";
+import { getGroupDetailThunk } from "./AffiliateGroups.detail.action";
+import PaymentMethodsModal from "./modals/AffiliateGroups.paymentMethods.modal";
 
 const STATUS_CLASS: Record<AffiliateStatus, string> = {
   active: "bg-emerald-100 text-emerald-700",
@@ -87,6 +89,12 @@ const AffiliateGroupsContainer: React.FC = () => {
   const { data, meta, loading, createGroupLoading } = useSelector(
     (state: RootState) => state.affiliateGroups,
   );
+  const groupDetailData = useSelector(
+    (state: RootState) => state.groupDetail?.data ?? null,
+  );
+  const groupDetailLoading = useSelector(
+    (state: RootState) => state.groupDetail?.loading ?? false,
+  );
 
   const [search, setSearch] = useState("");
   const [showGroups, setShowGroups] = useState(true);
@@ -95,6 +103,7 @@ const AffiliateGroupsContainer: React.FC = () => {
   >("all");
   const [page, setPage] = useState(1);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [paymentMethodGroupId, setPaymentMethodGroupId] = useState<number | null>(null);
 
   const handleClear = () => {
     setSearch("");
@@ -126,6 +135,15 @@ const AffiliateGroupsContainer: React.FC = () => {
 
   const handleViewGroup = (groupId: number) => {
     navigate(`/affiliate-groups/${groupId}`);
+  };
+
+  const handleOpenPaymentMethods = (groupId: number) => {
+    setPaymentMethodGroupId(groupId);
+    dispatch(getGroupDetailThunk(groupId));
+  };
+
+  const handleClosePaymentMethods = () => {
+    setPaymentMethodGroupId(null);
   };
 
   useEffect(() => {
@@ -238,9 +256,9 @@ const AffiliateGroupsContainer: React.FC = () => {
                 <th className="px-4 py-3 font-semibold text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody>
               {Array.isArray(data) && data.filter(Boolean).length > 0 ? (
-                data.filter(Boolean).map((group: any) => {
+                data.filter(Boolean).map((group: any, groupIndex: number) => {
                   const paymentTypeRaw =
                     group.paymentMethods?.[0]?.type ?? "cash";
                   const paymentType =
@@ -251,9 +269,25 @@ const AffiliateGroupsContainer: React.FC = () => {
                     ? group.affiliates.filter(Boolean)
                     : [];
 
+                  // Alternating accent color per group so each block is visually distinct
+                  const accentBorder = groupIndex % 2 === 0
+                    ? "border-l-4 border-l-teal-400"
+                    : "border-l-4 border-l-blue-400";
+                  const accentAffiliate = groupIndex % 2 === 0
+                    ? "border-l-4 border-l-teal-200"
+                    : "border-l-4 border-l-blue-200";
+
                   return (
                     <React.Fragment key={group.id}>
-                      <tr className="hover:bg-slate-50 transition-colors">
+                      {/* Spacer between groups */}
+                      {groupIndex > 0 && (
+                        <tr aria-hidden="true">
+                          <td colSpan={10} className="h-2 bg-slate-100 p-0" />
+                        </tr>
+                      )}
+
+                      {/* Group header row */}
+                      <tr className={`bg-white hover:bg-slate-50 transition-colors border-t-2 border-slate-200 ${accentBorder}`}>
                         <td className="px-6 py-4 text-slate-400 font-medium">
                           {group.id}
                         </td>
@@ -283,11 +317,16 @@ const AffiliateGroupsContainer: React.FC = () => {
                           {group.plan?.name ?? "N/A"}
                         </td>
                         <td className="px-4 py-4 text-slate-700">
-                          <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPaymentMethods(group.id)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-teal-100 hover:text-teal-700 px-2 py-1 text-xs font-semibold transition-colors cursor-pointer"
+                            title="Gestionar formas de pago"
+                          >
                             <PaymentIcon className="w-3 h-3" />
                             {PAYMENT_METHOD_LABEL[paymentType] ??
                               paymentTypeRaw}
-                          </span>
+                          </button>
                         </td>
                         <td className="px-4 py-4">
                           <span
@@ -309,72 +348,67 @@ const AffiliateGroupsContainer: React.FC = () => {
                         </td>
                       </tr>
 
+                      {/* Affiliate rows — visually connected to the group above */}
                       {showGroups &&
-                        affiliates.map((affiliate: any, index: number) => (
+                        affiliates.map((affiliate: any) => (
                           <tr
                             key={`${group.id}-affiliate-${affiliate.id}`}
-                            className={
+                            className={`${accentAffiliate} ${
                               affiliate.isVerified
-                                ? "bg-emerald-50/80 text-slate-700"
-                                : "bg-rose-50/80 text-slate-700"
-                            }
+                                ? "bg-emerald-50/60"
+                                : "bg-rose-50/60"
+                            } text-slate-700`}
                           >
-                            <td className="px-6 py-3 text-slate-400 font-medium">
-                              {index === 0 ? "" : ""}
+                            <td className="px-6 py-2.5 text-slate-300 text-xs font-medium">
+                              └
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-2.5">
                               {affiliate.isHolder ? (
-                                <span>-</span>
+                                <span className="text-slate-400 text-xs">—</span>
                               ) : (
-                                <div className="pl-4 border-l-2 border-slate-200">
-                                  <div className="font-medium text-slate-700">
+                                <div>
+                                  <div className="font-medium text-slate-700 text-xs">
                                     {formatAffiliateName(affiliate)}
                                   </div>
-                                  <div className="mt-1 text-xs text-slate-500">
+                                  <div className="text-[10px] text-slate-400">
                                     Integrante
                                   </div>
                                 </div>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-slate-600">
+                            <td className="px-4 py-2.5 text-slate-600">
                               {affiliate.isHolder ? (
                                 <div>
-                                  <div className="font-medium text-slate-700">
+                                  <div className="font-medium text-slate-700 text-xs">
                                     {formatAffiliateName(affiliate)}
                                   </div>
-                                  <div className="mt-1 text-xs text-slate-500">
+                                  <div className="text-[10px] text-slate-400">
                                     Titular
                                   </div>
                                 </div>
                               ) : (
-                                "-"
+                                <span className="text-slate-400 text-xs">—</span>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-slate-600">
+                            <td className="px-4 py-2.5 text-slate-500 text-xs">
                               {affiliate.birthDate
-                                ? new Date(
-                                    affiliate.birthDate,
-                                  ).toLocaleDateString()
-                                : "N/A"}
+                                ? new Date(affiliate.birthDate).toLocaleDateString()
+                                : "—"}
                             </td>
-                            <td className="px-4 py-3 text-slate-600 font-mono text-xs">
-                              {affiliate.documentNumber ?? "N/A"}
+                            <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">
+                              {affiliate.documentNumber ?? "—"}
                             </td>
-                            <td className="px-4 py-3 text-slate-600">
+                            <td className="px-4 py-2.5 text-slate-600 text-xs">
                               <PhoneLink phone={affiliate.phone} />
                             </td>
-                            <td className="px-4 py-3 text-slate-600">-</td>
-                            <td className="px-4 py-3 text-slate-500 text-xs">
-                              -
+                            <td className="px-4 py-2.5 text-slate-400 text-xs">—</td>
+                            <td className="px-4 py-2.5 text-slate-400 text-xs">—</td>
+                            <td className="px-4 py-2.5">
+                              <span className={`text-[10px] font-semibold ${affiliate.isVerified ? "text-emerald-600" : "text-slate-400"}`}>
+                                {affiliate.isVerified ? "Verificado" : "Sin verificar"}
+                              </span>
                             </td>
-                            <td className="px-4 py-3">
-                              <div className="flex flex-col items-start gap-1">
-                                <span className="text-[11px] font-medium text-slate-500">
-                                  {affiliate.isActive ? "ACTIVO" : "INACTIVO"}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-right text-xs text-slate-400">
+                            <td className="px-4 py-2.5 text-right text-[10px] text-slate-400 font-medium">
                               Afiliado
                             </td>
                           </tr>
@@ -447,6 +481,25 @@ const AffiliateGroupsContainer: React.FC = () => {
         onClose={() => setIsCreateModalOpen(false)}
         onSubmit={handleCreateAffiliate}
       />
+
+      {paymentMethodGroupId !== null && groupDetailData && groupDetailData.id === paymentMethodGroupId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <PaymentMethodsModal
+              groupData={groupDetailData}
+              onClose={handleClosePaymentMethods}
+            />
+          </div>
+        </div>
+      )}
+
+      {paymentMethodGroupId !== null && groupDetailLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl px-8 py-6 text-slate-700 font-semibold">
+            Cargando formas de pago...
+          </div>
+        </div>
+      )}
     </div>
   );
 };
