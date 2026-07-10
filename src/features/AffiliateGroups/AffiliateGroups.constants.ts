@@ -61,8 +61,8 @@ export const paymentGatewayOptions: Array<{
   value: PaymentGatewayProvider;
   label: string;
 }> = [
-  { value: "PAYWAY", label: "Payway" },
-  { value: "SIRO", label: "Siro" },
+  { value: "PAYWAY", label: "Tarjeta C/D (Payway)" },
+  { value: "SIRO", label: "Débito Aut CBU (Siro)" },
 ];
 
 export const affiliateRows: AffiliateGroupsRow[] = [

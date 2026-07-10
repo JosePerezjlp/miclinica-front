@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
   CreditCard,
-  DollarSign,
   Eye,
   Edit2,
   FileText,
@@ -14,10 +13,12 @@ import {
 import type { AppDispatch, RootState } from "../../store/store";
 import {
   chargeNowForPeriodThunk,
+  checkBillingPeriodSiroStatusThunk,
   getGroupDetailThunk,
   registerManualPaymentThunk,
   settleDebtByGatewayThunk,
   settleDebtThunk,
+  updateManualPaymentThunk,
 } from "./AffiliateGroups.detail.action";
 import type { GroupDetailData } from "./AffiliateGroups.detail.types";
 import GroupInfoModal from "./modals/AffiliateGroups.groupInfo.modal";
@@ -28,8 +29,12 @@ import {
   BillingContent,
   type UnifiedPaymentEntry,
 } from "./modals/AffiliateGroups.billing.modal";
+import { applyDiscount } from "../../api/groupDetail.service";
+import { calculateNextChargeDate } from "./AffiliateGroups.utils";
+import { MovementsContent } from "./AffiliateGroups.movements";
 
 type DetailTab = "information" | "transactions";
+type TransactionsView = "billing" | "movements";
 type GroupAffiliate = GroupDetailData["affiliates"][number];
 type SettlementPreviewItem = {
   billingPeriodId: number;
@@ -47,35 +52,6 @@ const buildBillingPeriodKey = (month: number, year: number) =>
 
 const formatBillingPeriodLabel = (month: number, year: number) =>
   `${String(month).padStart(2, "0")}/${year}`;
-
-const clampChargeDay = (year: number, month: number, chargeDay: number) => {
-  const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
-  return Math.min(Math.max(chargeDay, 1), lastDayOfMonth);
-};
-
-const calculateNextChargeDate = (chargeDay: number, now = new Date()) => {
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-  const currentMonthDay = clampChargeDay(currentYear, currentMonth, chargeDay);
-  const currentCandidate = new Date(currentYear, currentMonth, currentMonthDay);
-
-  if (currentCandidate.getTime() > now.getTime()) {
-    return currentCandidate;
-  }
-
-  const nextMonthDate = new Date(currentYear, currentMonth + 1, 1);
-  const nextMonthDay = clampChargeDay(
-    nextMonthDate.getFullYear(),
-    nextMonthDate.getMonth(),
-    chargeDay,
-  );
-
-  return new Date(
-    nextMonthDate.getFullYear(),
-    nextMonthDate.getMonth(),
-    nextMonthDay,
-  );
-};
 
 const formatAffiliateFullName = (affiliate: GroupAffiliate) =>
   [affiliate.firstName, affiliate.lastName].filter(Boolean).join(" ") ||
@@ -189,6 +165,7 @@ const PLAN_STATUS_LABELS: Record<string, string> = {
 const AffiliateGroupsDetailContainer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
 
   const {
@@ -204,6 +181,8 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
     "info" | "members" | "payments" | "plans" | null
   >(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("transactions");
+  const [transactionsView, setTransactionsView] =
+    useState<TransactionsView>("billing");
   const [selectedAffiliate, setSelectedAffiliate] =
     useState<GroupAffiliate | null>(null);
   const [paymentToSettle, setPaymentToSettle] =
@@ -218,10 +197,25 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
     number | null
   >(null);
   const [chargingPeriodId, setChargingPeriodId] = useState<number | null>(null);
-  const [chargeNowLoading, setChargeNowLoading] = useState(false);
   const [chargeNowFeedback, setChargeNowFeedback] = useState<{
     ok: boolean;
     message: string;
+  } | null>(null);
+  const [checkingPeriodId, setCheckingPeriodId] = useState<number | null>(null);
+  const [discountTarget, setDiscountTarget] = useState<UnifiedPaymentEntry | null>(null);
+  const [discountAmount, setDiscountAmount] = useState("");
+  const [discountReason, setDiscountReason] = useState("");
+  const [discountSubmitting, setDiscountSubmitting] = useState(false);
+  const [discountError, setDiscountError] = useState("");
+  const [siroStatusModal, setSiroStatusModal] = useState<{
+    billingPeriodId: number;
+    billingPeriodStatus: string;
+    nroTransaccion?: string;
+    estado?: string;
+    estadoLabel?: string;
+    cantidadErrores?: number;
+    isError?: boolean;
+    message?: string;
   } | null>(null);
   const [showDebtSettlementModal, setShowDebtSettlementModal] = useState(false);
   const [debtSettlementForm, setDebtSettlementForm] = useState({
@@ -238,6 +232,19 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
       dispatch(getGroupDetailThunk(parseInt(id, 10)));
     }
   }, [dispatch, id]);
+
+  // Al llegar recién creado desde el alta de pago automático, abrir el modal
+  // de miembros para completar los datos del cliente en el momento.
+  useEffect(() => {
+    const shouldOpenMembers = (
+      location.state as { openMembersModal?: boolean } | null
+    )?.openMembersModal;
+
+    if (groupData && shouldOpenMembers) {
+      setActiveModal("members");
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [groupData, location, navigate]);
 
   if (!id) {
     return (
@@ -320,16 +327,13 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
     0,
   );
 
-  const billingBalance =
-    Number(
-      groupData.currentAccount?.balanceCapital ?? computedPendingBalance,
-    ) || 0;
+  const billingBalance = computedPendingBalance;
   const formattedPlanPrice = groupData.plan
     ? `$${Number(groupData.plan.monthlyFee).toFixed(2)}`
     : "Sin precio";
   const nextChargeDate = calculateNextChargeDate(groupData.chargeDay);
   const promoterName = groupData.promoter?.name?.trim() || "Sin promotor";
-  const cityLabel = "No informada";
+  const cityLabel = groupData.city?.name?.trim() || "No informada";
   const debtSettlementDiscount = Math.max(
     0,
     Number(debtSettlementForm.discountAmount || 0),
@@ -384,10 +388,47 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
     });
   };
 
+  const handleOpenDiscount = (payment: UnifiedPaymentEntry) => {
+    setDiscountTarget(payment);
+    setDiscountAmount(String(payment.remainingAmount ?? ""));
+    setDiscountReason("");
+    setDiscountError("");
+  };
+
+  const handleSubmitDiscount = async () => {
+    if (!discountTarget || !groupData) return;
+    const amount = parseFloat(discountAmount.replace(",", "."));
+    if (!amount || amount <= 0) {
+      setDiscountError("Ingresá un monto válido.");
+      return;
+    }
+    const remaining = discountTarget.remainingAmount ?? 0;
+    if (amount > remaining) {
+      setDiscountError(`El monto no puede superar el saldo pendiente ($${remaining.toFixed(2)}).`);
+      return;
+    }
+    setDiscountSubmitting(true);
+    setDiscountError("");
+    try {
+      await applyDiscount(groupData.id, {
+        billingPeriodId: discountTarget.billingPeriodId!,
+        amount,
+        type: amount >= remaining ? "TOTAL" : "PARTIAL",
+        reason: discountReason.trim() || "Bonificación aplicada por operador",
+        appliedBy: "admin",
+      });
+      setDiscountTarget(null);
+      dispatch(getGroupDetailThunk(groupData.id));
+    } catch (err: any) {
+      setDiscountError(err?.response?.data?.message ?? "No se pudo aplicar la bonificación.");
+    } finally {
+      setDiscountSubmitting(false);
+    }
+  };
+
   const handleChargeNow = async (payment: UnifiedPaymentEntry) => {
     if (!payment.billingPeriodId || chargingPeriodId !== null) return;
     setChargingPeriodId(payment.billingPeriodId);
-    setChargeNowLoading(true);
     setChargeNowFeedback(null);
     const result = await dispatch(
       chargeNowForPeriodThunk({
@@ -396,7 +437,6 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
       }),
     );
     setChargingPeriodId(null);
-    setChargeNowLoading(false);
     if (chargeNowForPeriodThunk.fulfilled.match(result)) {
       setChargeNowFeedback({
         ok: true,
@@ -411,6 +451,44 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
       });
     }
     setTimeout(() => setChargeNowFeedback(null), 6000);
+  };
+
+  const handleCheckStatus = async (payment: UnifiedPaymentEntry) => {
+    if (!payment.billingPeriodId || checkingPeriodId !== null) return;
+    setCheckingPeriodId(payment.billingPeriodId);
+    const result = await dispatch(
+      checkBillingPeriodSiroStatusThunk({
+        groupId: parseInt(id, 10),
+        billingPeriodId: payment.billingPeriodId,
+      }),
+    );
+    setCheckingPeriodId(null);
+    dispatch(getGroupDetailThunk(parseInt(id, 10)));
+    if (checkBillingPeriodSiroStatusThunk.fulfilled.match(result)) {
+      setSiroStatusModal(result.payload);
+    } else {
+      setSiroStatusModal({
+        billingPeriodId: payment.billingPeriodId ?? 0,
+        billingPeriodStatus: "ERROR",
+        message: (result.payload as any)?.message || "Error al consultar el estado SIRO.",
+      });
+    }
+  };
+
+  const handleEditPayment = async (
+    payment: UnifiedPaymentEntry,
+    fields: { amount?: number; reference?: string; notes?: string },
+  ) => {
+    const result = await dispatch(
+      updateManualPaymentThunk({
+        groupId: groupData.id,
+        paymentId: payment.id,
+        payload: fields,
+      }),
+    );
+    if (updateManualPaymentThunk.rejected.match(result)) {
+      throw new Error((result.payload as any)?.message || "Error al actualizar el pago");
+    }
   };
 
   const openDebtSettlementModal = () => {
@@ -562,7 +640,8 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Plan */}
         <button
           type="button"
           onClick={() => setActiveModal("plans")}
@@ -595,49 +674,66 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
           </div>
         </button>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-emerald-500">
+        {/* Miembros — clickable, muestra titular */}
+        <button
+          type="button"
+          onClick={() => setActiveModal("members")}
+          className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-emerald-500 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+        >
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-slate-500 text-sm">Miembros</p>
               <p className="text-2xl font-bold text-slate-900 mt-2">
                 {groupData.affiliates?.length || 0}
               </p>
+              {holder && (
+                <div className="mt-2 space-y-0.5">
+                  <p className="text-sm font-semibold text-slate-700 truncate">
+                    {holder.firstName} {holder.lastName}
+                    <span className="ml-1.5 text-xs font-normal text-emerald-600">Titular</span>
+                  </p>
+                  {holder.phone && (
+                    <p className="text-xs text-slate-500 truncate">{String(holder.phone)}</p>
+                  )}
+                  {holder.email && (
+                    <p className="text-xs text-slate-500 truncate">{holder.email}</p>
+                  )}
+                </div>
+              )}
             </div>
-            <Users className="w-10 h-10 text-emerald-500 opacity-20" />
+            <Users className="w-10 h-10 text-emerald-500 opacity-20 flex-shrink-0" />
           </div>
-        </div>
+        </button>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-500">
+        {/* Formas de Pago — clickable, abre PaymentMethodsModal */}
+        <button
+          type="button"
+          onClick={() => setActiveModal("payments")}
+          className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-amber-500 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+        >
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-slate-500 text-sm">Formas de Pago</p>
               <p className="text-2xl font-bold text-slate-900 mt-2">
                 {activeMethods.length}
               </p>
+              {activeMethods.length > 0 ? (
+                <div className="mt-2 space-y-0.5">
+                  {activeMethods.slice(0, 2).map((m) => (
+                    <p key={m.id} className="text-xs text-slate-500 truncate">
+                      {m.gateway} · {m.type}
+                      {m.priority === 1 && <span className="ml-1 text-amber-600 font-medium">(principal)</span>}
+                    </p>
+                  ))}
+                  {activeMethods.length > 2 && (
+                    <p className="text-xs text-slate-400">+{activeMethods.length - 2} más</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 mt-2">Sin métodos activos</p>
+              )}
             </div>
-            <CreditCard className="w-10 h-10 text-amber-500 opacity-20" />
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={openDebtSettlementModal}
-          disabled={billingBalance <= 0}
-          className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-500 text-left transition-colors hover:bg-red-50 disabled:cursor-default disabled:hover:bg-white"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-slate-500 text-sm">Saldo Cuenta</p>
-              <p className="text-2xl font-bold text-slate-900 mt-2">
-                ${billingBalance.toFixed(2)}
-              </p>
-              <p className="mt-2 text-xs font-semibold text-slate-500">
-                {billingBalance > 0
-                  ? "Click para regularizar saldo pendiente"
-                  : "Sin deuda pendiente"}
-              </p>
-            </div>
-            <DollarSign className="w-10 h-10 text-red-500 opacity-20" />
+            <CreditCard className="w-10 h-10 text-amber-500 opacity-20 flex-shrink-0" />
           </div>
         </button>
       </div>
@@ -720,6 +816,18 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
                     </p>
                     <p className="text-lg font-semibold text-slate-900 mt-1">
                       {groupData.rating}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs uppercase text-slate-500 font-semibold">
+                      Fecha de inscripción
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900 mt-1">
+                      {groupData.joinedAt
+                        ? new Date(groupData.joinedAt).toLocaleDateString("es-AR")
+                        : "—"}
                     </p>
                   </div>
                 </div>
@@ -938,30 +1046,72 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-slate-900">Transacciones</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Historial completo de facturación, pagos y saldo por período.
-            </p>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                {transactionsView === "billing" ? "Transacciones" : "Movimientos"}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {transactionsView === "billing"
+                  ? "Historial completo de facturación, pagos y saldo por período."
+                  : "Historial completo de cobros automáticos, fallos y movimientos de cuenta corriente, ordenados por fecha."}
+              </p>
+            </div>
+            <div className="bg-slate-100 rounded-lg p-1 inline-flex gap-1">
+              <button
+                type="button"
+                onClick={() => setTransactionsView("billing")}
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                  transactionsView === "billing"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Transacciones
+              </button>
+              <button
+                type="button"
+                onClick={() => setTransactionsView("movements")}
+                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                  transactionsView === "movements"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Movimientos
+              </button>
+            </div>
           </div>
 
-          {chargeNowFeedback && (
-            <div
-              className={`mb-4 rounded-lg px-4 py-3 text-sm font-semibold ${
-                chargeNowFeedback.ok
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : "bg-red-50 text-red-700 border border-red-200"
-              }`}
-            >
-              {chargeNowFeedback.message}
-            </div>
+          {transactionsView === "billing" ? (
+            <>
+              {chargeNowFeedback && (
+                <div
+                  className={`mb-4 rounded-lg px-4 py-3 text-sm font-semibold ${
+                    chargeNowFeedback.ok
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-red-50 text-red-700 border border-red-200"
+                  }`}
+                >
+                  {chargeNowFeedback.message}
+                </div>
+              )}
+              <BillingContent
+                groupData={groupData}
+                onPayRemaining={nextAutomaticMethod ? handleChargeNow : openSettlePaymentModal}
+                onCheckStatus={handleCheckStatus}
+                onApplyDiscount={handleOpenDiscount}
+                onEditPayment={handleEditPayment}
+                chargeLabel={nextAutomaticMethod ? "Cobrar" : "Pagar"}
+                chargingPeriodId={chargingPeriodId}
+                checkingPeriodId={checkingPeriodId}
+                billingBalance={billingBalance}
+                onOpenDebtSettlement={openDebtSettlementModal}
+              />
+            </>
+          ) : (
+            <MovementsContent groupData={groupData} />
           )}
-          <BillingContent
-            groupData={groupData}
-            onPayRemaining={nextAutomaticMethod ? handleChargeNow : openSettlePaymentModal}
-            chargeLabel={nextAutomaticMethod ? "Cobrar" : "Pagar"}
-            chargingPeriodId={chargingPeriodId}
-          />
         </div>
       )}
 
@@ -1170,9 +1320,11 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
                   }
                   className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="CASH">CASH</option>
-                  <option value="TRANSFER">TRANSFER</option>
-                  <option value="CARD">CARD</option>
+                  <option value="CASH">Efectivo</option>
+                  <option value="TRANSFER">Transferencia</option>
+                  {activeMethods.some(
+                    (pm) => pm.type?.toUpperCase() === "CARD" || pm.gateway === "PAYWAY" || pm.gateway === "MOBBEX",
+                  ) && <option value="CARD">Tarjeta</option>}
                 </select>
               </div>
 
@@ -1227,6 +1379,92 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {siroStatusModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${siroStatusModal.isError ? "bg-red-100" : "bg-amber-100"}`}>
+                  <span className="text-lg">{siroStatusModal.isError ? "❌" : "🔍"}</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Estado SIRO</h3>
+                  <p className="text-xs text-slate-500">
+                    {siroStatusModal.nroTransaccion ? `Transacción #${siroStatusModal.nroTransaccion}` : "Consulta de estado"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSiroStatusModal(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-6 py-6 space-y-4">
+              {siroStatusModal.message && !siroStatusModal.estado && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  {siroStatusModal.message}
+                </div>
+              )}
+
+              {siroStatusModal.estado && (
+                <>
+                  <div className={`rounded-xl border px-4 py-3 ${siroStatusModal.isError ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Estado</p>
+                    <p className={`text-base font-bold ${siroStatusModal.isError ? "text-red-700" : "text-amber-700"}`}>
+                      {siroStatusModal.estado}
+                    </p>
+                    {siroStatusModal.estadoLabel && (
+                      <p className="mt-1 text-sm text-slate-600">{siroStatusModal.estadoLabel}</p>
+                    )}
+                  </div>
+
+                  {typeof siroStatusModal.cantidadErrores === "number" && siroStatusModal.cantidadErrores > 0 && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-red-500 mb-1">Registros con error</p>
+                      <p className="text-lg font-bold text-red-700">{siroStatusModal.cantidadErrores}</p>
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">Estado del período</p>
+                    <span className={`inline-block rounded-full px-3 py-1 text-xs font-bold ${
+                      siroStatusModal.billingPeriodStatus === "FAILED"
+                        ? "bg-red-100 text-red-700"
+                        : siroStatusModal.billingPeriodStatus === "IN_PROGRESS"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-emerald-100 text-emerald-700"
+                    }`}>
+                      {siroStatusModal.billingPeriodStatus === "IN_PROGRESS"
+                        ? "En proceso"
+                        : siroStatusModal.billingPeriodStatus === "FAILED"
+                          ? "Fallido"
+                          : siroStatusModal.billingPeriodStatus}
+                    </span>
+                    {siroStatusModal.billingPeriodStatus === "FAILED" && (
+                      <p className="mt-2 text-xs text-red-600">El período fue marcado como fallido por errores reportados por SIRO.</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="border-t border-slate-100 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setSiroStatusModal(null)}
+                className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1539,21 +1777,30 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
                           <label className="mb-1.5 block text-xs font-semibold text-slate-700">
                             Método de pago
                           </label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {(["CASH", "TRANSFER", "CARD"] as const).map((m) => (
-                              <button
-                                key={m}
-                                type="button"
-                                onClick={() => setDebtSettlementForm((c) => ({ ...c, method: m }))}
-                                className={`rounded-xl border-2 px-3 py-2 text-xs font-bold transition-all ${
-                                  debtSettlementForm.method === m
-                                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                                    : "border-slate-200 text-slate-600 hover:border-slate-300"
-                                }`}
-                              >
-                                {m === "CASH" ? "Efectivo" : m === "TRANSFER" ? "Transferencia" : "Tarjeta"}
-                              </button>
-                            ))}
+                          <div className="flex flex-wrap gap-2">
+                            {(["CASH", "TRANSFER", "CARD"] as const)
+                              .filter((m) => {
+                                if (m === "CARD") {
+                                  return activeMethods.some(
+                                    (pm) => pm.type?.toUpperCase() === "CARD" || pm.gateway === "PAYWAY" || pm.gateway === "MOBBEX",
+                                  );
+                                }
+                                return true;
+                              })
+                              .map((m) => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => setDebtSettlementForm((c) => ({ ...c, method: m }))}
+                                  className={`rounded-xl border-2 px-4 py-2 text-xs font-bold transition-all ${
+                                    debtSettlementForm.method === m
+                                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                                      : "border-slate-200 text-slate-600 hover:border-slate-300"
+                                  }`}
+                                >
+                                  {m === "CASH" ? "Efectivo" : m === "TRANSFER" ? "Transferencia" : "Tarjeta"}
+                                </button>
+                              ))}
                           </div>
                         </div>
 
@@ -1644,6 +1891,88 @@ const AffiliateGroupsDetailContainer: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* Discount modal */}
+      {discountTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl mx-4">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h3 className="text-base font-semibold text-slate-800">Aplicar Bonificación</h3>
+              <button
+                type="button"
+                onClick={() => setDiscountTarget(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-3 text-sm text-violet-800">
+                <div className="font-medium">
+                  Período {String(discountTarget.month).padStart(2, "0")}/{discountTarget.year}
+                </div>
+                <div className="text-violet-600 mt-0.5">
+                  Saldo pendiente: <span className="font-semibold">${(discountTarget.remainingAmount ?? 0).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                  Monto a bonificar ($)
+                </label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  max={discountTarget.remainingAmount ?? undefined}
+                  value={discountAmount}
+                  onChange={(e) => setDiscountAmount(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                  Motivo <span className="text-slate-400">(opcional)</span>
+                </label>
+                <textarea
+                  value={discountReason}
+                  onChange={(e) => setDiscountReason(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                  placeholder="Ej: deuda antigua, acuerdo con el socio..."
+                />
+              </div>
+
+              {discountError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">
+                  {discountError}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setDiscountTarget(null)}
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitDiscount}
+                  disabled={discountSubmitting}
+                  className="flex-1 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:opacity-50"
+                >
+                  {discountSubmitting ? "Aplicando..." : "Aplicar Bonificación"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

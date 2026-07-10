@@ -35,6 +35,8 @@ export const updateGroupInfo = async (
     holderFullName?: string;
     isActive?: boolean;
     chargeDay?: number;
+    promoterId?: number;
+    cityId?: number;
   },
 ): Promise<GroupDetailData> => {
   const { data } = await apiClient.patch(`/groups/${groupId}`, payload);
@@ -176,4 +178,60 @@ export const updatePlan = async (
 ): Promise<GroupDetailData> => {
   const { data } = await apiClient.patch(`/groups/${groupId}/plan`, payload);
   return transformNumericStrings(data);
+};
+
+export const applyDiscount = async (
+  groupId: number,
+  payload: {
+    billingPeriodId: number;
+    amount: number;
+    type: "PARTIAL" | "TOTAL";
+    reason?: string;
+    appliedBy: string;
+  },
+): Promise<{ id: number }> => {
+  const { data } = await apiClient.post(
+    `/groups/${groupId}/billing/discounts`,
+    payload,
+  );
+  return data;
+};
+
+export const updateManualPayment = async (
+  groupId: number,
+  paymentId: number,
+  payload: {
+    amount?: number;
+    paidAt?: string;
+    reference?: string;
+    notes?: string;
+  },
+): Promise<GroupDetailData> => {
+  await apiClient.patch(
+    `/groups/${groupId}/billing/manual-payments/${paymentId}`,
+    payload,
+  );
+  const { data } = await apiClient.get(`/groups/${groupId}`);
+  return transformNumericStrings(data);
+};
+
+export const checkSiroStatus = async (
+  groupId: number,
+  billingPeriodId: number,
+): Promise<{
+  billingPeriodId: number;
+  billingPeriodStatus: string;
+  nroTransaccion?: string;
+  estado?: string;
+  estadoLabel?: string;
+  cantidadErrores?: number;
+  isError?: boolean;
+  siroStatus?: Record<string, unknown> | null;
+  message?: string;
+}> => {
+  const { data } = await apiClient.post(
+    `/groups/${groupId}/payment-attempts/check-siro-status`,
+    { billingPeriodId },
+  );
+  return data;
 };

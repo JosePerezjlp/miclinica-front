@@ -94,6 +94,33 @@ export const registerManualPaymentThunk = createAsyncThunk<
   },
 );
 
+export const updateManualPaymentThunk = createAsyncThunk<
+  GroupDetailData,
+  {
+    groupId: number;
+    paymentId: number;
+    payload: {
+      amount?: number;
+      paidAt?: string;
+      reference?: string;
+      notes?: string;
+    };
+  },
+  { rejectValue: { message: string } }
+>(
+  "groupDetail/updateManualPayment",
+  async ({ groupId, paymentId, payload }, { rejectWithValue }) => {
+    try {
+      return await groupDetailService.updateManualPayment(groupId, paymentId, payload);
+    } catch (error: any) {
+      return rejectWithValue({
+        message:
+          error?.response?.data?.message || "Error al actualizar el pago",
+      });
+    }
+  },
+);
+
 export const settleDebtThunk = createAsyncThunk<
   GroupDetailData,
   {
@@ -351,6 +378,37 @@ const GATEWAY_RESULT_LABELS: Record<string, string> = {
   FAILED_GATEWAY_TIMEOUT: "Tiempo de espera agotado en el gateway.",
   FAILED_CBU_INVALID: "CBU inválido o no tiene adhesión de Débito Directo vigente en SIRO. Verificá que sea un CBU bancario real (no un CVU de billetera digital).",
 };
+
+export const checkBillingPeriodSiroStatusThunk = createAsyncThunk<
+  {
+    billingPeriodId: number;
+    billingPeriodStatus: string;
+    nroTransaccion?: string;
+    estado?: string;
+    estadoLabel?: string;
+    cantidadErrores?: number;
+    isError?: boolean;
+    siroStatus?: Record<string, unknown> | null;
+    message?: string;
+    groupData?: GroupDetailData;
+  },
+  { groupId: number; billingPeriodId: number },
+  { rejectValue: { message: string } }
+>(
+  "groupDetail/checkBillingPeriodSiroStatus",
+  async ({ groupId, billingPeriodId }, { rejectWithValue }) => {
+    try {
+      const statusResult = await groupDetailService.checkSiroStatus(groupId, billingPeriodId);
+      const groupData = await groupDetailService.getGroupDetail(groupId);
+      return { ...statusResult, groupData };
+    } catch (error: any) {
+      return rejectWithValue({
+        message:
+          error?.response?.data?.message || "Error al consultar el estado SIRO",
+      });
+    }
+  },
+);
 
 export const updatePlanThunk = createAsyncThunk<
   GroupDetailData,

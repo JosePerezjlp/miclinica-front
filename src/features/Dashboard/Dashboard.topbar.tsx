@@ -1,8 +1,12 @@
 import React from "react";
-import { Bell, Search, UserCog, LogOut } from "lucide-react";
+import { Bell, Search, UserCog, LogOut, Menu } from "lucide-react";
 import { clearAuthTokens } from "../../api/tokenStorage";
 
-const DashboardTopbar: React.FC = () => {
+interface DashboardTopbarProps {
+  onMenuClick?: () => void;
+}
+
+const DashboardTopbar: React.FC<DashboardTopbarProps> = ({ onMenuClick }) => {
   const handleLogOut = () => {
     clearAuthTokens();
     window.location.href = "/login";
@@ -10,7 +14,16 @@ const DashboardTopbar: React.FC = () => {
 
   return (
     <header className="h-20 bg-white border-b border-slate-200 px-6 flex items-center gap-4">
-      <button className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500">
+      {/* Hamburger — solo visible en mobile */}
+      <button
+        type="button"
+        onClick={onMenuClick}
+        className="lg:hidden h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500"
+      >
+        <Menu className="w-4 h-4" />
+      </button>
+
+      <button className="hidden lg:flex h-8 w-8 rounded-lg border border-slate-200 items-center justify-center text-slate-500">
         <UserCog className="w-4 h-4" />
       </button>
 

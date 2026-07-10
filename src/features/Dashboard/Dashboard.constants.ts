@@ -6,6 +6,7 @@ import {
   CircleDollarSign,
   CircleX,
   CreditCard,
+  Gift,
   Landmark,
   LayoutDashboard,
   ListChecks,
@@ -58,6 +59,7 @@ export const sideSections: DashboardSideSection[] = [
       { label: "Afiliados", icon: BookUser, path: "/affiliate-groups" },
       { label: "Carnet Online", icon: CreditCard },
       { label: "Planes", icon: ScanText, path: "/plans" },
+      { label: "Beneficios", icon: Gift, path: "/benefits" },
     ],
   },
   {

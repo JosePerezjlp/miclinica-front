@@ -6,12 +6,15 @@ export interface GroupDetailData {
   holderFullName: string;
   isActive: boolean;
   chargeDay: number;
+  joinedAt: string | null;
   planId: number | null;
   promoterId: number | null;
   planStatus: string;
   gracePeriodEndsAt: string | null;
   rating: string;
   ratingUpdatedAt: string | null;
+  cityId: number | null;
+  city: { id: number; name: string } | null;
   promoter: {
     id: number;
     createdAt: string;
@@ -69,6 +72,18 @@ export interface GroupDetailData {
     dueDate: string;
     amountDue: number;
     status: string;
+    attempts: Array<{
+      id: number;
+      result: string;
+      failureCode: string | null;
+      failureMessage: string | null;
+      gateway: string;
+      scheduledAt: string;
+      executedAt: string | null;
+      attemptNumber: number;
+      gatewayTransactionId: string | null;
+      amountCharged: number | string | null;
+    }>;
   }>;
   payments: Array<{
     id: number;
@@ -107,6 +122,17 @@ export interface GroupDetailData {
     advanceBalance: number;
     createdAt: string;
     updatedAt: string;
+    transactions: Array<{
+      id: number;
+      kind: string;
+      amountCapital: number | string;
+      amountInterest: number | string;
+      description: string | null;
+      billingPeriodId: number | null;
+      manualPaymentId: number | null;
+      createdBy: string | null;
+      createdAt: string;
+    }>;
   } | null;
   discounts: Array<{
     id: number;
@@ -131,6 +157,9 @@ export interface UpdateGroupInfoPayload {
   holderFullName?: string;
   isActive?: boolean;
   chargeDay?: number;
+  joinedAt?: string;
+  promoterId?: number;
+  cityId?: number;
 }
 
 export interface AddAffiliatePayload {

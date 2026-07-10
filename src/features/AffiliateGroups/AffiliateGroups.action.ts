@@ -156,7 +156,7 @@ export const onCreateGroupThunk =
 
       dispatch(onCreateGroupError(parsedMessage));
       toast.error(parsedMessage);
-      throw error;
+      throw new Error(parsedMessage);
     }
   };
 

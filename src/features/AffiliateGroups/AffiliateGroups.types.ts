@@ -27,7 +27,7 @@ export interface CashMember {
   address: string;
   email: string;
   phone: string;
-  inscriptionDate: string;
+  existingGroupId?: number;
 }
 
 export interface AutomaticAffiliateGroupFormData {
@@ -35,6 +35,11 @@ export interface AutomaticAffiliateGroupFormData {
   gateway: PaymentGatewayProvider;
   plan: string;
   planId?: number;
+  promoterId?: number;
+  promoterName?: string;
+  seller?: string;
+  city?: string;
+  cityId?: number | null;
   mobbexSubscriptionId: string;
   mobbexWebhook?: string;
   paymentMethod: "card" | "cbu";
@@ -48,6 +53,7 @@ export interface AutomaticAffiliateGroupFormData {
   dni: string;
   deviceFingerprintId: string;
   paywayPaymentMethodId?: number;
+  inscriptionDate?: string;
 }
 
 export interface CashAffiliateGroupFormData {
@@ -64,6 +70,7 @@ export interface CashAffiliateGroupFormData {
   city: string;
   cityId?: number | null;
   members: CashMember[];
+  inscriptionDate?: string;
 }
 
 export type CreateAffiliateGroupModalPayload =
@@ -88,6 +95,7 @@ export interface CreateGroupRequest {
   promoterId?: number;
   cityId?: number | null;
   planName?: string;
+  joinedAt?: string;
   affiliates: CreateAffiliateRequest[];
   paymentMethod?: CreateGroupPaymentMethodRequest;
   initialManualPayment?: CreateManualPaymentRequest;
@@ -120,6 +128,8 @@ export interface GroupResponse {
     name: string;
   } | null;
   planStatus?: string | null;
+  gracePeriodEndsAt?: string | null;
+  chargeDay: number;
   affiliates: Array<{
     id: number;
     firstName: string;
@@ -157,6 +167,7 @@ export interface FamiliarGroupsFilters {
   page?: number;
   pageSize?: number;
   dni?: string;
+  search?: string;
   paymentType?: "all" | "card" | "cbu" | "cash";
 }
 
