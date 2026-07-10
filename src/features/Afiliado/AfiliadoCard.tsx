@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { useReactToPrint } from "react-to-print";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -9,13 +10,15 @@ import {
   Clock,
   CreditCard,
   Landmark,
-  Printer,
+  FileDown,
   Share2,
-  Users,
   AlertTriangle,
   ShieldCheck,
 } from "lucide-react";
-import { getAfiliadoByDni, type AfiliadoPublicData } from "../../api/afiliado.service";
+import {
+  getAfiliadoByDni,
+  type AfiliadoPublicData,
+} from "../../api/afiliado.service";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -42,15 +45,25 @@ const MONTH_NAMES = [
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return d.toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function formatMoney(value: number | string) {
   const n = typeof value === "string" ? parseFloat(value) : value;
-  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
-function totalDebt(currentAccount: AfiliadoPublicData["group"]["currentAccount"]): number {
+function totalDebt(
+  currentAccount: AfiliadoPublicData["group"]["currentAccount"],
+): number {
   if (!currentAccount) return 0;
   return (
     parseFloat(String(currentAccount.balanceCapital)) +
@@ -61,8 +74,23 @@ function totalDebt(currentAccount: AfiliadoPublicData["group"]["currentAccount"]
 function getNextDebitDate(chargeDay: number): string {
   const today = new Date();
   const thisMonth = new Date(today.getFullYear(), today.getMonth(), chargeDay);
-  const target = thisMonth > today ? thisMonth : new Date(today.getFullYear(), today.getMonth() + 1, chargeDay);
-  return target.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const target =
+    thisMonth > today
+      ? thisMonth
+      : new Date(today.getFullYear(), today.getMonth() + 1, chargeDay);
+  return target.toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function todayFilenameSegment(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function planStatusColor(status: string) {
@@ -93,33 +121,91 @@ function billingStatusColor(status: string) {
 
 export default function AfiliadoCard() {
   const { dni } = useParams<{ dni: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState<AfiliadoPublicData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  // reCAPTCHA token forwarded from the search page via navigation state
+  const recaptchaToken = (
+    location.state as { recaptchaToken?: string } | null
+  )?.recaptchaToken;
 
   useEffect(() => {
     if (!dni) return;
     setLoading(true);
     setError(null);
-    getAfiliadoByDni(dni)
+    getAfiliadoByDni(dni, recaptchaToken)
       .then(setData)
       .catch((err) => {
-        const msg = err?.response?.status === 404
-          ? "No encontramos un afiliado con ese DNI."
-          : "Ocurrió un error al consultar. Intentá nuevamente.";
-        setError(msg);
+        const status = err?.response?.status;
+        if (status === 404) {
+          setError("No encontramos un afiliado con ese DNI.");
+        } else if (status === 429) {
+          setError(
+            "Demasiadas consultas en poco tiempo. Esperá 5 minutos e intentá nuevamente.",
+          );
+        } else if (status === 401) {
+          setError(
+            "Verificación reCAPTCHA inválida. Volvé a la búsqueda e intentá nuevamente.",
+          );
+        } else {
+          setError("Ocurrió un error al consultar. Intentá nuevamente.");
+        }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dni]);
 
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: `Credencial-${data?.affiliate.documentNumber ?? "afiliado"}`,
-  });
+  // ── PDF download ──────────────────────────────────────────────────────────
+  async function handleDownloadPdf() {
+    if (!printRef.current || !data) return;
+    setPdfLoading(true);
+    try {
+      const element = printRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#f8fafc",
+        scrollY: 0,
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
+      });
 
+      const imgData = canvas.toDataURL("image/png");
+      const pxToMm = 0.2645833333;
+      const imgWidthMm = canvas.width * pxToMm * 0.5; // scale=2, so halve
+      const imgHeightMm = canvas.height * pxToMm * 0.5;
+
+      // Always use portrait A4; scale content to fit width
+      const a4Width = 210;
+      const ratio = a4Width / imgWidthMm;
+      const finalHeight = imgHeightMm * ratio;
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: finalHeight > 297 ? [a4Width, finalHeight] : "a4",
+      });
+
+      pdf.addImage(imgData, "PNG", 0, 0, a4Width, finalHeight);
+
+      const affiliateName = `${data.affiliate.firstName}-${data.affiliate.lastName}`
+        .replace(/\s+/g, "-")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "");
+
+      pdf.save(`${todayFilenameSegment()}-clinica-${affiliateName}.pdf`);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
+  // ── Share ─────────────────────────────────────────────────────────────────
   async function handleShare() {
     const url = window.location.href;
     if (navigator.share) {
@@ -138,10 +224,10 @@ export default function AfiliadoCard() {
     }
   }
 
-  // ── Loading ──────────────────────────────────────────────────────────────
+  // ── Loading ───────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
           <p className="text-slate-500 text-sm">Consultando información…</p>
@@ -150,10 +236,10 @@ export default function AfiliadoCard() {
     );
   }
 
-  // ── Error ────────────────────────────────────────────────────────────────
+  // ── Error ─────────────────────────────────────────────────────────────────
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-sm text-center space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-red-100 flex items-center justify-center mx-auto">
             <AlertTriangle className="w-8 h-8 text-red-500" />
@@ -174,13 +260,12 @@ export default function AfiliadoCard() {
   const { affiliate, group } = data;
   const debt = totalDebt(group.currentAccount);
   const latestPeriod = group.billingPeriods[0] ?? null;
-  const preferredMethod = group.paymentMethods[0] ?? null;
   const pageUrl = window.location.href;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-6 px-4">
-      {/* back button — hidden when printing */}
-      <div className="max-w-sm mx-auto mb-4 print:hidden">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 py-6 px-4">
+      {/* back button */}
+      <div className="max-w-sm mx-auto mb-4">
         <button
           onClick={() => navigate("/afiliado")}
           className="inline-flex items-center gap-1.5 text-slate-500 text-sm hover:text-slate-700 transition-colors"
@@ -190,13 +275,12 @@ export default function AfiliadoCard() {
         </button>
       </div>
 
-      {/* ── printable area ─────────────────────────────────────────────── */}
-      <div ref={printRef} className="max-w-sm mx-auto space-y-3">
+      {/* ── printable / PDF area ────────────────────────────────────────── */}
+      <div ref={printRef} className="max-w-sm mx-auto space-y-3 pb-2">
 
-        {/* ── Header card ─────────────────────────────────────────────── */}
+        {/* Header card */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          {/* blue strip */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-5 pt-5 pb-14 relative">
+          <div className="bg-linear-to-r from-blue-600 to-blue-500 px-5 pt-5 pb-14 relative">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-blue-100 text-xs font-medium uppercase tracking-wider mb-0.5">
@@ -210,10 +294,9 @@ export default function AfiliadoCard() {
             </div>
           </div>
 
-          {/* info + QR */}
+          {/* Info + QR */}
           <div className="px-5 pb-5 -mt-10 relative">
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex gap-4">
-              {/* left info */}
               <div className="flex-1 space-y-2 min-w-0">
                 <InfoRow label="DNI" value={affiliate.documentNumber} />
                 <InfoRow
@@ -226,13 +309,11 @@ export default function AfiliadoCard() {
                 />
                 {group.plan && (
                   <InfoRow
-                    label="Cuota"
+                    label="Cuota mensual"
                     value={formatMoney(group.plan.monthlyFee)}
                   />
                 )}
               </div>
-
-              {/* QR */}
               <div className="shrink-0 flex flex-col items-center gap-1">
                 <QRCodeSVG
                   value={pageUrl}
@@ -250,7 +331,7 @@ export default function AfiliadoCard() {
           </div>
         </div>
 
-        {/* ── Cobertura ────────────────────────────────────────────────── */}
+        {/* Cobertura */}
         <Section title="Cobertura">
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
@@ -278,7 +359,8 @@ export default function AfiliadoCard() {
                     className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${billingStatusColor(latestPeriod.status)}`}
                   >
                     {MONTH_NAMES[latestPeriod.month - 1]} {latestPeriod.year} ·{" "}
-                    {BILLING_STATUS_LABEL[latestPeriod.status] ?? latestPeriod.status}
+                    {BILLING_STATUS_LABEL[latestPeriod.status] ??
+                      latestPeriod.status}
                   </span>
                 </div>
 
@@ -293,7 +375,9 @@ export default function AfiliadoCard() {
 
             {group.gracePeriodEndsAt && (
               <div className="flex items-center justify-between">
-                <span className="text-slate-500 text-sm">Período de gracia hasta</span>
+                <span className="text-slate-500 text-sm">
+                  Período de gracia hasta
+                </span>
                 <span className="text-amber-600 text-sm font-medium">
                   {formatDate(group.gracePeriodEndsAt)}
                 </span>
@@ -302,20 +386,22 @@ export default function AfiliadoCard() {
           </div>
         </Section>
 
-        {/* ── Deuda ────────────────────────────────────────────────────── */}
+        {/* Deuda */}
         {debt > 0 && (
           <div className="bg-red-50 border border-red-100 rounded-2xl px-5 py-4 flex items-center justify-between">
             <div>
               <p className="text-red-700 text-xs font-semibold uppercase tracking-wider mb-0.5">
                 Deuda pendiente
               </p>
-              <p className="text-red-600 text-2xl font-bold">{formatMoney(debt)}</p>
+              <p className="text-red-600 text-2xl font-bold">
+                {formatMoney(debt)}
+              </p>
             </div>
             <AlertTriangle className="w-8 h-8 text-red-300 shrink-0" />
           </div>
         )}
 
-        {/* ── Integrantes ──────────────────────────────────────────────── */}
+        {/* Integrantes */}
         <Section title="Integrantes del grupo">
           <ul className="space-y-2">
             {group.affiliates.map((a) => (
@@ -323,7 +409,8 @@ export default function AfiliadoCard() {
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                     <span className="text-blue-600 text-[11px] font-bold">
-                      {a.firstName[0]}{a.lastName[0]}
+                      {a.firstName[0]}
+                      {a.lastName[0]}
                     </span>
                   </div>
                   <span className="text-slate-700 text-sm font-medium truncate">
@@ -340,7 +427,7 @@ export default function AfiliadoCard() {
           </ul>
         </Section>
 
-        {/* ── Métodos de pago ──────────────────────────────────────────── */}
+        {/* Métodos de pago */}
         {group.paymentMethods.length > 0 && (
           <Section title="Métodos de pago">
             <ul className="space-y-2">
@@ -357,11 +444,11 @@ export default function AfiliadoCard() {
                     <p className="text-slate-700 text-sm font-medium leading-tight">
                       {pm.type === "CARD"
                         ? `${pm.brand ?? "Tarjeta"} •••• ${pm.last4 ?? "****"}`
-                        : `CBU ${pm.gateway}`}
+                        : `CBU · ${pm.gateway}`}
                     </p>
                     <p className="text-slate-400 text-xs">{pm.gateway}</p>
                   </div>
-                  {idx === 0 && preferredMethod && (
+                  {idx === 0 && (
                     <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">
                       Preferida
                     </span>
@@ -371,50 +458,48 @@ export default function AfiliadoCard() {
             </ul>
           </Section>
         )}
-
-        {/* ── Actions ──────────────────────────────────────────────────── */}
-        <div className="flex gap-3 print:hidden pb-4">
-          <button
-            onClick={handlePrint}
-            className="flex-1 flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold text-sm py-3 rounded-xl hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm"
-          >
-            <Printer className="w-4 h-4" />
-            Imprimir / PDF
-          </button>
-          <button
-            onClick={handleShare}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold text-sm py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-sm"
-          >
-            <Share2 className="w-4 h-4" />
-            Compartir
-          </button>
-        </div>
-
-        {/* ── Group members count footer ───────────────────────────────── */}
-        <p className="text-center text-xs text-slate-400 pb-2 print:hidden">
-          <Users className="w-3.5 h-3.5 inline mr-1" />
-          Grupo familiar · {group.affiliates.length}{" "}
-          {group.affiliates.length === 1 ? "integrante" : "integrantes"}
-        </p>
       </div>
 
-      {/* print-only styles */}
-      <style>{`
-        @media print {
-          body { background: white !important; }
-          .print\\:hidden { display: none !important; }
-        }
-      `}</style>
+      {/* ── Action buttons (excluded from PDF capture) ─────────────────── */}
+      <div className="max-w-sm mx-auto mt-3 flex gap-3 pb-6">
+        <button
+          onClick={handleDownloadPdf}
+          disabled={pdfLoading}
+          className="flex-1 flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold text-sm py-3 rounded-xl hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm disabled:opacity-60"
+        >
+          {pdfLoading ? (
+            <span className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+          ) : (
+            <FileDown className="w-4 h-4" />
+          )}
+          {pdfLoading ? "Generando…" : "Descargar PDF"}
+        </button>
+        <button
+          onClick={handleShare}
+          className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold text-sm py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-sm"
+        >
+          <Share2 className="w-4 h-4" />
+          Compartir
+        </button>
+      </div>
     </div>
   );
 }
 
-// ─── small sub-components ────────────────────────────────────────────────────
+// ─── sub-components ──────────────────────────────────────────────────────────
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="bg-white rounded-2xl shadow-sm px-5 py-4 space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+        {title}
+      </p>
       {children}
     </div>
   );
@@ -423,8 +508,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] text-slate-400 uppercase tracking-wider leading-none mb-0.5">{label}</p>
-      <p className="text-slate-800 text-sm font-semibold leading-snug truncate">{value}</p>
+      <p className="text-[10px] text-slate-400 uppercase tracking-wider leading-none mb-0.5">
+        {label}
+      </p>
+      <p className="text-slate-800 text-sm font-semibold leading-snug truncate">
+        {value}
+      </p>
     </div>
   );
 }

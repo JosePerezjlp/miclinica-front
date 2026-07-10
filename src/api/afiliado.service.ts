@@ -64,11 +64,24 @@ export interface AfiliadoPublicData {
   };
 }
 
+/**
+ * Fetch public affiliate data.
+ * @param recaptchaToken - Optional reCAPTCHA v2 token from the search form.
+ *   When present it is validated by the backend. Absent on direct URL access
+ *   (QR scan, shared link) — rate limiting is the fallback protection.
+ */
 export async function getAfiliadoByDni(
   dni: string,
+  recaptchaToken?: string,
 ): Promise<AfiliadoPublicData> {
+  const headers: Record<string, string> = {};
+  if (recaptchaToken) {
+    headers["x-recaptcha-token"] = recaptchaToken;
+  }
+
   const { data } = await publicClient.get<AfiliadoPublicData>(
     `/public/afiliado/${dni}`,
+    { headers },
   );
   return data;
 }

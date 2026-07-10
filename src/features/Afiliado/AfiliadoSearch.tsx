@@ -1,25 +1,47 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import ReCAPTCHA from "react-google-recaptcha";
 import { Search, ShieldCheck } from "lucide-react";
+
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as
+  | string
+  | undefined;
 
 export default function AfiliadoSearch() {
   const [dni, setDni] = useState("");
   const [error, setError] = useState("");
+  const [captchaError, setCaptchaError] = useState("");
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
   const navigate = useNavigate();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError("");
+    setCaptchaError("");
+
     const normalized = dni.replace(/\D/g, "");
     if (!normalized || normalized.length < 6) {
       setError("Ingresá un DNI válido (mínimo 6 dígitos).");
       return;
     }
-    setError("");
-    navigate(`/afiliado/${normalized}`);
+
+    // reCAPTCHA check — only enforced when site key is configured
+    const recaptchaToken = recaptchaRef.current?.getValue() ?? null;
+    if (RECAPTCHA_SITE_KEY && !recaptchaToken) {
+      setCaptchaError("Completá la verificación reCAPTCHA antes de continuar.");
+      return;
+    }
+
+    // Reset widget so it can be used again on the next search
+    recaptchaRef.current?.reset();
+
+    navigate(`/afiliado/${normalized}`, {
+      state: { recaptchaToken: recaptchaToken ?? undefined },
+    });
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center px-4">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center mb-4 shadow-lg">
@@ -60,6 +82,22 @@ export default function AfiliadoSearch() {
               <p className="mt-1.5 text-xs text-red-500 font-medium">{error}</p>
             )}
           </div>
+
+          {/* reCAPTCHA — rendered only when the site key is configured */}
+          {RECAPTCHA_SITE_KEY && (
+            <div className="flex flex-col items-center gap-1.5">
+              <ReCAPTCHA
+                ref={recaptchaRef}
+                sitekey={RECAPTCHA_SITE_KEY}
+                onExpired={() => recaptchaRef.current?.reset()}
+              />
+              {captchaError && (
+                <p className="text-xs text-red-500 font-medium text-center">
+                  {captchaError}
+                </p>
+              )}
+            </div>
+          )}
 
           <button
             type="submit"
