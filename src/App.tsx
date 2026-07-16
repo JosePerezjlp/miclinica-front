@@ -17,6 +17,7 @@ import DashboardLayout from "./components/DashboardLayout";
 import { useAppSelector } from "./store/hooks";
 import AfiliadoSearch from "./features/Afiliado/AfiliadoSearch";
 import AfiliadoCard from "./features/Afiliado/AfiliadoCard";
+import AfiliadoDeuda from "./features/Afiliado/AfiliadoDeuda";
 
 type RouteChildren = {
   children: ReactElement;
@@ -174,6 +175,7 @@ function App() {
         />
         <Route path="/afiliado" element={<AfiliadoSearch />} />
         <Route path="/afiliado/:dni" element={<AfiliadoCard />} />
+        <Route path="/afiliado/:dni/deuda" element={<AfiliadoDeuda />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

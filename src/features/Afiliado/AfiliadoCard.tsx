@@ -14,10 +14,13 @@ import {
   Share2,
   AlertTriangle,
   ShieldCheck,
+  CheckCheck,
+  Lock,
 } from "lucide-react";
 import {
   getAfiliadoByDni,
   type AfiliadoPublicData,
+  type Benefit,
 } from "../../api/afiliado.service";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -62,12 +65,12 @@ function formatMoney(value: number | string) {
 }
 
 function totalDebt(
-  currentAccount: AfiliadoPublicData["group"]["currentAccount"],
+  ca: AfiliadoPublicData["group"]["currentAccount"],
 ): number {
-  if (!currentAccount) return 0;
+  if (!ca) return 0;
   return (
-    parseFloat(String(currentAccount.balanceCapital)) +
-    parseFloat(String(currentAccount.balanceInterest))
+    parseFloat(String(ca.balanceCapital)) +
+    parseFloat(String(ca.balanceInterest))
   );
 }
 
@@ -83,6 +86,15 @@ function getNextDebitDate(chargeDay: number): string {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+function monthsActive(createdAt: string): number {
+  const start = new Date(createdAt);
+  const now = new Date();
+  return (
+    (now.getFullYear() - start.getFullYear()) * 12 +
+    (now.getMonth() - start.getMonth())
+  );
 }
 
 function todayFilenameSegment(): string {
@@ -117,6 +129,91 @@ function billingStatusColor(status: string) {
   return map[status] ?? "text-slate-600 bg-slate-50";
 }
 
+// ─── BenefitsSection ────────────────────────────────────────────────────────
+
+function BenefitsSection({
+  benefits,
+  groupCreatedAt,
+}: {
+  benefits: Benefit[];
+  groupCreatedAt: string;
+}) {
+  if (benefits.length === 0) return null;
+
+  const months = monthsActive(groupCreatedAt);
+  const immediate = benefits.filter(
+    (b) => b.minMonthsActive === null || b.minMonthsActive === 0,
+  );
+  const bySeniority = benefits.filter(
+    (b) => b.minMonthsActive !== null && b.minMonthsActive > 0,
+  );
+
+  return (
+    <>
+      {immediate.length > 0 && (
+        <Section title="Beneficios del plan">
+          <ul className="space-y-2">
+            {immediate.map((b) => (
+              <li key={b.id} className="flex items-start gap-2.5">
+                <CheckCheck className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-slate-700 text-sm font-medium leading-tight">
+                    {b.name}
+                  </p>
+                  {(b.description || b.freeDescription) && (
+                    <p className="text-slate-400 text-xs mt-0.5 leading-snug">
+                      {b.freeDescription ?? b.description}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {bySeniority.length > 0 && (
+        <Section title="Beneficios por antigüedad">
+          <ul className="space-y-2">
+            {bySeniority.map((b) => {
+              const min = b.minMonthsActive!;
+              const unlocked = months >= min;
+              const remaining = min - months;
+              return (
+                <li key={b.id} className="flex items-start gap-2.5">
+                  {unlocked ? (
+                    <CheckCheck className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-slate-300 mt-0.5 shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p
+                      className={`text-sm font-medium leading-tight ${unlocked ? "text-slate-700" : "text-slate-400"}`}
+                    >
+                      {b.name}
+                    </p>
+                    {!unlocked && (
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Disponible en {remaining}{" "}
+                        {remaining === 1 ? "mes" : "meses"} más
+                      </p>
+                    )}
+                    {unlocked && (b.freeDescription ?? b.description) && (
+                      <p className="text-xs text-slate-400 mt-0.5 leading-snug">
+                        {b.freeDescription ?? b.description}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      )}
+    </>
+  );
+}
+
 // ─── component ──────────────────────────────────────────────────────────────
 
 export default function AfiliadoCard() {
@@ -130,7 +227,6 @@ export default function AfiliadoCard() {
   const [error, setError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
-  // reCAPTCHA token forwarded from the search page via navigation state
   const recaptchaToken = (
     location.state as { recaptchaToken?: string } | null
   )?.recaptchaToken;
@@ -143,69 +239,64 @@ export default function AfiliadoCard() {
       .then(setData)
       .catch((err) => {
         const status = err?.response?.status;
-        if (status === 404) {
+        if (status === 404)
           setError("No encontramos un afiliado con ese DNI.");
-        } else if (status === 429) {
+        else if (status === 429)
           setError(
             "Demasiadas consultas en poco tiempo. Esperá 5 minutos e intentá nuevamente.",
           );
-        } else if (status === 401) {
+        else if (status === 401)
           setError(
             "Verificación reCAPTCHA inválida. Volvé a la búsqueda e intentá nuevamente.",
           );
-        } else {
-          setError("Ocurrió un error al consultar. Intentá nuevamente.");
-        }
+        else setError("Ocurrió un error al consultar. Intentá nuevamente.");
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dni]);
 
-  // ── PDF download ──────────────────────────────────────────────────────────
+  // ── PDF ──────────────────────────────────────────────────────────────────
   async function handleDownloadPdf() {
     if (!printRef.current || !data) return;
     setPdfLoading(true);
     try {
-      const element = printRef.current;
-      const canvas = await html2canvas(element, {
+      const el = printRef.current;
+      const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#f8fafc",
         scrollY: 0,
-        windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
       });
 
       const imgData = canvas.toDataURL("image/png");
       const pxToMm = 0.2645833333;
-      const imgWidthMm = canvas.width * pxToMm * 0.5; // scale=2, so halve
-      const imgHeightMm = canvas.height * pxToMm * 0.5;
-
-      // Always use portrait A4; scale content to fit width
-      const a4Width = 210;
-      const ratio = a4Width / imgWidthMm;
-      const finalHeight = imgHeightMm * ratio;
+      const imgWMm = (canvas.width * pxToMm) / 2;
+      const imgHMm = (canvas.height * pxToMm) / 2;
+      const a4W = 210;
+      const ratio = a4W / imgWMm;
+      const finalH = imgHMm * ratio;
 
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
-        format: finalHeight > 297 ? [a4Width, finalHeight] : "a4",
+        format: finalH > 297 ? [a4W, finalH] : "a4",
       });
+      pdf.addImage(imgData, "PNG", 0, 0, a4W, finalH);
 
-      pdf.addImage(imgData, "PNG", 0, 0, a4Width, finalHeight);
-
-      const affiliateName = `${data.affiliate.firstName}-${data.affiliate.lastName}`
+      const name = `${data.affiliate.firstName}-${data.affiliate.lastName}`
         .replace(/\s+/g, "-")
         .normalize("NFD")
         .replace(/[̀-ͯ]/g, "");
 
-      pdf.save(`${todayFilenameSegment()}-clinica-${affiliateName}.pdf`);
+      pdf.save(`${todayFilenameSegment()}-clinica-${name}.pdf`);
     } finally {
       setPdfLoading(false);
     }
   }
 
-  // ── Share ─────────────────────────────────────────────────────────────────
+  // ── Share ────────────────────────────────────────────────────────────────
   async function handleShare() {
     const url = window.location.href;
     if (navigator.share) {
@@ -216,7 +307,7 @@ export default function AfiliadoCard() {
           url,
         });
       } catch {
-        // user cancelled
+        /* user cancelled */
       }
     } else {
       await navigator.clipboard.writeText(url);
@@ -224,7 +315,7 @@ export default function AfiliadoCard() {
     }
   }
 
-  // ── Loading ───────────────────────────────────────────────────────────────
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 flex items-center justify-center">
@@ -236,7 +327,7 @@ export default function AfiliadoCard() {
     );
   }
 
-  // ── Error ─────────────────────────────────────────────────────────────────
+  // ── Error ────────────────────────────────────────────────────────────────
   if (error || !data) {
     return (
       <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center px-4">
@@ -261,6 +352,7 @@ export default function AfiliadoCard() {
   const debt = totalDebt(group.currentAccount);
   const latestPeriod = group.billingPeriods[0] ?? null;
   const pageUrl = window.location.href;
+  const benefits = group.plan?.benefits ?? [];
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 py-6 px-4">
@@ -275,12 +367,12 @@ export default function AfiliadoCard() {
         </button>
       </div>
 
-      {/* ── printable / PDF area ────────────────────────────────────────── */}
+      {/* ── PDF-captured area ───────────────────────────────────────────── */}
       <div ref={printRef} className="max-w-sm mx-auto space-y-3 pb-2">
 
-        {/* Header card */}
+        {/* Header */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="bg-linear-to-r from-blue-600 to-blue-500 px-5 pt-5 pb-14 relative">
+          <div className="bg-linear-to-r from-blue-600 to-blue-500 px-5 pt-5 pb-14">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-blue-100 text-xs font-medium uppercase tracking-wider mb-0.5">
@@ -293,20 +385,12 @@ export default function AfiliadoCard() {
               <ShieldCheck className="w-8 h-8 text-blue-200 mt-0.5 shrink-0" />
             </div>
           </div>
-
-          {/* Info + QR */}
-          <div className="px-5 pb-5 -mt-10 relative">
+          <div className="px-5 pb-5 -mt-10">
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex gap-4">
               <div className="flex-1 space-y-2 min-w-0">
                 <InfoRow label="DNI" value={affiliate.documentNumber} />
-                <InfoRow
-                  label="Afiliado desde"
-                  value={formatDate(group.createdAt)}
-                />
-                <InfoRow
-                  label="Plan"
-                  value={group.plan?.name ?? "Sin plan asignado"}
-                />
+                <InfoRow label="Afiliado desde" value={formatDate(group.createdAt)} />
+                <InfoRow label="Plan" value={group.plan?.name ?? "Sin plan"} />
                 {group.plan && (
                   <InfoRow
                     label="Cuota mensual"
@@ -343,14 +427,12 @@ export default function AfiliadoCard() {
                 {PLAN_STATUS_LABEL[group.planStatus] ?? group.planStatus}
               </span>
             </div>
-
             <div className="flex items-center justify-between">
               <span className="text-slate-500 text-sm">Día de débito</span>
               <span className="text-slate-800 text-sm font-medium">
                 {group.chargeDay} de cada mes
               </span>
             </div>
-
             {latestPeriod && (
               <>
                 <div className="flex items-center justify-between">
@@ -359,11 +441,9 @@ export default function AfiliadoCard() {
                     className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${billingStatusColor(latestPeriod.status)}`}
                   >
                     {MONTH_NAMES[latestPeriod.month - 1]} {latestPeriod.year} ·{" "}
-                    {BILLING_STATUS_LABEL[latestPeriod.status] ??
-                      latestPeriod.status}
+                    {BILLING_STATUS_LABEL[latestPeriod.status] ?? latestPeriod.status}
                   </span>
                 </div>
-
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 text-sm">Próximo débito</span>
                   <span className="text-slate-800 text-sm font-medium">
@@ -372,7 +452,6 @@ export default function AfiliadoCard() {
                 </div>
               </>
             )}
-
             {group.gracePeriodEndsAt && (
               <div className="flex items-center justify-between">
                 <span className="text-slate-500 text-sm">
@@ -386,18 +465,33 @@ export default function AfiliadoCard() {
           </div>
         </Section>
 
+        {/* Benefits */}
+        <BenefitsSection benefits={benefits} groupCreatedAt={group.createdAt} />
+
         {/* Deuda */}
         {debt > 0 && (
-          <div className="bg-red-50 border border-red-100 rounded-2xl px-5 py-4 flex items-center justify-between">
-            <div>
-              <p className="text-red-700 text-xs font-semibold uppercase tracking-wider mb-0.5">
-                Deuda pendiente
-              </p>
-              <p className="text-red-600 text-2xl font-bold">
-                {formatMoney(debt)}
-              </p>
+          <div className="bg-red-50 border border-red-100 rounded-2xl px-5 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-red-700 text-xs font-semibold uppercase tracking-wider mb-0.5">
+                  Deuda pendiente
+                </p>
+                <p className="text-red-600 text-2xl font-bold">
+                  {formatMoney(debt)}
+                </p>
+              </div>
+              <AlertTriangle className="w-8 h-8 text-red-300 shrink-0" />
             </div>
-            <AlertTriangle className="w-8 h-8 text-red-300 shrink-0" />
+            <button
+              onClick={() =>
+                navigate(`/afiliado/${dni}/deuda`, {
+                  state: { data },
+                })
+              }
+              className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-sm font-semibold transition-colors"
+            >
+              Ver y pagar deuda
+            </button>
           </div>
         )}
 
@@ -409,8 +503,7 @@ export default function AfiliadoCard() {
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                     <span className="text-blue-600 text-[11px] font-bold">
-                      {a.firstName[0]}
-                      {a.lastName[0]}
+                      {a.firstName[0]}{a.lastName[0]}
                     </span>
                   </div>
                   <span className="text-slate-700 text-sm font-medium truncate">
@@ -460,7 +553,7 @@ export default function AfiliadoCard() {
         )}
       </div>
 
-      {/* ── Action buttons (excluded from PDF capture) ─────────────────── */}
+      {/* Action buttons — outside PDF area */}
       <div className="max-w-sm mx-auto mt-3 flex gap-3 pb-6">
         <button
           onClick={handleDownloadPdf}
